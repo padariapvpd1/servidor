@@ -6,76 +6,143 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Recebe informações do aplicativo Android
-app.post("/api/device", (req, res) => {
+// Remove possíveis prefixos do IPv4
+function limparIP(ip) {
+    if (!ip) return "Desconhecido";
+
+    if (ip.includes(",")) {
+        ip = ip.split(",")[0].trim();
+    }
+
+    return ip.replace("::ffff:", "");
+}
+
+// Consulta informações aproximadas do IP
+async function localizarIP(ip) {
     try {
-        const dados = req.body;
-
-        // Descobre o IP da conexão
-        let ip = req.headers["x-forwarded-for"];
-
-        if (ip) {
-            ip = ip.split(",")[0].trim();
-        } else {
-            ip = req.socket.remoteAddress;
-        }
-
-        if (ip) {
-            ip = ip.replace("::ffff:", "");
-        }
-
-        console.log("");
-        console.log("========================================");
-        console.log("       NOVO DISPOSITIVO CONECTADO");
-        console.log("========================================");
-
-        console.log("Marca:       ", dados.marca || "Desconhecida");
-        console.log("Fabricante:  ", dados.fabricante || "Desconhecido");
-        console.log("Modelo:      ", dados.modelo || "Desconhecido");
-        console.log("Android:     ", dados.android || "Desconhecido");
-        console.log("SDK:         ", dados.sdk || "Desconhecido");
-        console.log("IP:          ", ip || "Desconhecido");
-
+        // Não tenta localizar IPs locais
         if (
-            dados.latitude !== undefined &&
-            dados.longitude !== undefined
+            ip === "127.0.0.1" ||
+            ip === "::1" ||
+            ip.startsWith("192.168.") ||
+            ip.startsWith("10.") ||
+            ip.startsWith("172.16.") ||
+            ip.startsWith("172.17.") ||
+            ip.startsWith("172.18.") ||
+            ip.startsWith("172.19.") ||
+            ip.startsWith("172.20.") ||
+            ip.startsWith("172.21.") ||
+            ip.startsWith("172.22.") ||
+            ip.startsWith("172.23.") ||
+            ip.startsWith("172.24.") ||
+            ip.startsWith("172.25.") ||
+            ip.startsWith("172.26.") ||
+            ip.startsWith("172.27.") ||
+            ip.startsWith("172.28.") ||
+            ip.startsWith("172.29.") ||
+            ip.startsWith("172.30.") ||
+            ip.startsWith("172.31.")
         ) {
-            console.log("Latitude:    ", dados.latitude);
-            console.log("Longitude:   ", dados.longitude);
-        } else {
-            console.log("Localização: não autorizada");
+            return null;
         }
 
-        console.log("========================================");
-        console.log("");
+        const resposta = await fetch(
+            `https://ipwho.is/${encodeURIComponent(ip)}`
+        );
 
-        res.status(200).json({
-            sucesso: true,
-            mensagem: "Informações recebidas"
-        });
+        if (!resposta.ok) {
+            return null;
+        }
+
+        const dados = await resposta.json();
+
+        if (!dados.success) {
+            return null;
+        }
+
+        return {
+            cidade: dados.city || "Desconhecida",
+            estado: dados.region || "Desconhecido",
+            pais: dados.country || "Desconhecido"
+        };
 
     } catch (erro) {
-        console.error("Erro ao processar dispositivo:", erro);
-
-        res.status(500).json({
-            sucesso: false,
-            mensagem: "Erro no servidor"
-        });
+        console.log("Erro ao consultar localização do IP:", erro.message);
+        return null;
     }
+}
+
+
+// Recebe informações do aplicativo Android
+app.post("/api/device", async (req, res) => {
+
+    const dados = req.body;
+
+    let ip =
+        req.headers["x-forwarded-for"] ||
+        req.socket.remoteAddress;
+
+    ip = limparIP(ip);
+
+    console.clear();
+
+    console.log("");
+    console.log("========================================");
+    console.log("       NOVO DISPOSITIVO CONECTADO");
+    console.log("========================================");
+
+    console.log("Marca:       ", dados.marca || "Desconhecida");
+    console.log("Fabricante:  ", dados.fabricante || "Desconhecido");
+    console.log("Modelo:      ", dados.modelo || "Desconhecido");
+    console.log("IP público:  ", ip);
+
+    // Localização aproximada pelo IP
+    const localizacao = await localizarIP(ip);
+
+    if (localizacao) {
+
+        console.log("");
+        console.log("Localização aproximada pelo IP:");
+        console.log("Cidade:      ", localizacao.cidade);
+        console.log("Estado:      ", localizacao.estado);
+        console.log("País:        ", localizacao.pais);
+
+    } else {
+
+        console.log("");
+        console.log("Localização pelo IP: não disponível");
+    }
+
+    console.log("");
+    console.log("========================================");
+    console.log("");
+
+    res.json({
+        sucesso: true,
+        cidade: localizacao?.cidade || null,
+        estado: localizacao?.estado || null,
+        pais: localizacao?.pais || null
+    });
 });
+
 
 // Página inicial
 app.get("/", (req, res) => {
+
     res.send("Servidor funcionando!");
+
 });
 
+
 // Inicia o servidor
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
+
     console.log("");
     console.log("========================================");
     console.log("       SERVIDOR INICIADO");
     console.log("========================================");
-    console.log("Porta:", PORT);
+    console.log(`Porta: ${PORT}`);
     console.log("Aguardando dispositivos...");
     console.log("");
+
 });
