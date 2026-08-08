@@ -6,18 +6,17 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-// Recebe informações do aplicativo Android
 app.post("/api/device", (req, res) => {
     try {
         const dados = req.body || {};
 
-        // Obtém o IP da conexão
-        let ip = req.headers["x-forwarded-for"];
+        let ip =
+            req.headers["x-forwarded-for"] ||
+            req.socket.remoteAddress ||
+            "Desconhecido";
 
-        if (ip) {
+        if (ip.includes(",")) {
             ip = ip.split(",")[0].trim();
-        } else {
-            ip = req.socket.remoteAddress || "Desconhecido";
         }
 
         ip = ip.replace("::ffff:", "");
@@ -30,14 +29,18 @@ app.post("/api/device", (req, res) => {
         console.log("Marca:       ", dados.marca || "Desconhecida");
         console.log("Fabricante:  ", dados.fabricante || "Desconhecido");
         console.log("Modelo:      ", dados.modelo || "Desconhecido");
-        console.log("IP público:  ", ip);
+        console.log("Android:     ", dados.android || "Desconhecido");
+        console.log("IP:          ", ip);
 
-        // O aplicativo pode enviar localização aproximada,
-        // caso o usuário tenha autorizado.
+        console.log("");
+        console.log("Localização autorizada:");
+        console.log("Bairro:      ", dados.bairro || "Não informado");
         console.log("Cidade:      ", dados.cidade || "Não informada");
         console.log("Estado:      ", dados.estado || "Não informado");
+        console.log("CEP:         ", dados.cep || "Não informado");
         console.log("País:        ", dados.pais || "Não informado");
 
+        console.log("");
         console.log("========================================");
         console.log("");
 
@@ -47,6 +50,7 @@ app.post("/api/device", (req, res) => {
         });
 
     } catch (erro) {
+
         console.error("Erro ao processar dispositivo:", erro);
 
         res.status(500).json({
@@ -56,12 +60,12 @@ app.post("/api/device", (req, res) => {
     }
 });
 
-// Teste
 app.get("/", (req, res) => {
     res.status(200).send("Servidor funcionando!");
 });
 
 app.listen(PORT, "0.0.0.0", () => {
+
     console.log("");
     console.log("========================================");
     console.log("       SERVIDOR INICIADO");
@@ -69,4 +73,5 @@ app.listen(PORT, "0.0.0.0", () => {
     console.log("Porta:", PORT);
     console.log("Aguardando dispositivos...");
     console.log("");
+
 });
