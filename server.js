@@ -44,6 +44,19 @@ async function buscarEndereco(latitude, longitude) {
 }
 
 // ========================================
+// ESCAPAR HTML
+// ========================================
+
+function escapar(valor) {
+    return String(valor ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// ========================================
 // HISTÓRICO
 // ========================================
 
@@ -191,7 +204,7 @@ app.post("/api/device", async (req, res) => {
         );
 
         // ========================================
-        // BUSCAR ENDEREÇO
+        // BUSCAR ENDEREÇO COMPLETO
         // ========================================
 
         if (
@@ -217,6 +230,7 @@ app.post("/api/device", async (req, res) => {
                         address.suburb ||
                         address.neighbourhood ||
                         address.village ||
+                        address.hamlet ||
                         atual.bairro ||
                         "";
 
@@ -230,6 +244,7 @@ app.post("/api/device", async (req, res) => {
 
                     atual.estado =
                         address.state ||
+                        address.state_district ||
                         atual.estado ||
                         "";
 
@@ -262,19 +277,40 @@ app.post("/api/device", async (req, res) => {
         }
 
         console.log("");
-        console.log("========================================");
-        console.log("       DISPOSITIVO CONECTADO");
-        console.log("========================================");
+        console.log(
+            "========================================"
+        );
+        console.log(
+            "       DISPOSITIVO CONECTADO"
+        );
+        console.log(
+            "========================================"
+        );
         console.log("ID:", deviceId);
-        console.log("Modelo:", dispositivo.modelo);
-        console.log("Android:", dispositivo.android);
-        console.log("Bateria:", dispositivo.bateria);
+        console.log(
+            "Modelo:",
+            dispositivo.modelo
+        );
+        console.log(
+            "Android:",
+            dispositivo.android
+        );
+        console.log(
+            "Bateria:",
+            dispositivo.bateria
+        );
         console.log(
             "Localização:",
             dispositivo.latitude,
             dispositivo.longitude
         );
-        console.log("========================================");
+        console.log(
+            "Endereço:",
+            dispositivo.endereco
+        );
+        console.log(
+            "========================================"
+        );
         console.log("");
 
         res.json({
@@ -322,7 +358,9 @@ app.post("/api/command", (req, res) => {
         "NOTIFICATION"
     ];
 
-    if (!comandosPermitidos.includes(command)) {
+    if (
+        !comandosPermitidos.includes(command)
+    ) {
         return res.status(400).json({
             sucesso: false,
             erro: "Comando não permitido"
@@ -388,15 +426,12 @@ app.post("/api/command", (req, res) => {
     if (command === "NOTIFICATION") {
         detalhes =
             "Título: " +
-            (titulo || "Nova notificação") +
+            (titulo || "Nova mensagem") +
             " | Mensagem: " +
-            mensagem +
-            " | Som: " +
-            (comando.som ? "SIM" : "NÃO") +
-            " | Vibração: " +
-            (comando.vibrar ? "SIM" : "NÃO");
+            mensagem;
     } else {
-        detalhes = mensagem || "";
+        detalhes =
+            mensagem || "";
     }
 
     registrarComando(
@@ -406,16 +441,28 @@ app.post("/api/command", (req, res) => {
     );
 
     console.log("");
-    console.log("========================================");
-    console.log("          NOVO COMANDO");
-    console.log("========================================");
-    console.log("Dispositivo:", deviceId);
-    console.log("Comando:", command);
+    console.log(
+        "========================================"
+    );
+    console.log(
+        "          NOVO COMANDO"
+    );
+    console.log(
+        "========================================"
+    );
+    console.log(
+        "Dispositivo:",
+        deviceId
+    );
+    console.log(
+        "Comando:",
+        command
+    );
 
     if (command === "NOTIFICATION") {
         console.log(
             "Título:",
-            titulo || "Nova notificação"
+            titulo || "Nova mensagem"
         );
 
         console.log(
@@ -434,12 +481,15 @@ app.post("/api/command", (req, res) => {
         );
     }
 
-    console.log("========================================");
+    console.log(
+        "========================================"
+    );
     console.log("");
 
     res.json({
         sucesso: true,
-        mensagem: "Comando colocado na fila"
+        mensagem:
+            "Comando colocado na fila"
     });
 });
 
@@ -459,20 +509,23 @@ app.get(
         if (!dispositivo) {
             return res.status(404).json({
                 sucesso: false,
-                erro: "Dispositivo não encontrado"
+                erro:
+                    "Dispositivo não encontrado"
             });
         }
 
         if (dispositivo.revogado) {
             return res.status(403).json({
                 sucesso: false,
-                erro: "Dispositivo revogado",
+                erro:
+                    "Dispositivo revogado",
                 comando: null
             });
         }
 
         const fila =
-            comandosPendentes.get(deviceId) || [];
+            comandosPendentes.get(deviceId) ||
+            [];
 
         if (fila.length === 0) {
             return res.json({
@@ -495,97 +548,107 @@ app.get(
 // RECEBER RESPOSTA
 // ========================================
 
-app.post("/api/response", (req, res) => {
-    const {
-        deviceId,
-        response
-    } = req.body || {};
+app.post(
+    "/api/response",
+    (req, res) => {
+        const {
+            deviceId,
+            response
+        } = req.body || {};
 
-    if (
-        !deviceId ||
-        response === undefined
-    ) {
-        return res.status(400).json({
-            sucesso: false,
-            erro:
-                "deviceId e response são obrigatórios"
+        if (
+            !deviceId ||
+            response === undefined
+        ) {
+            return res.status(400).json({
+                sucesso: false,
+                erro:
+                    "deviceId e response são obrigatórios"
+            });
+        }
+
+        respostasDispositivos.set(
+            deviceId,
+            {
+                response: response,
+                recebidoEm:
+                    new Date().toISOString()
+            }
+        );
+
+        const dispositivo =
+            dispositivos.get(deviceId);
+
+        if (dispositivo) {
+            dispositivo.ultimoContato =
+                new Date().toISOString();
+
+            dispositivos.set(
+                deviceId,
+                dispositivo
+            );
+        }
+
+        console.log(
+            "Resposta:",
+            deviceId,
+            response
+        );
+
+        res.json({
+            sucesso: true
         });
     }
-
-    respostasDispositivos.set(
-        deviceId,
-        {
-            response: response,
-            recebidoEm:
-                new Date().toISOString()
-        }
-    );
-
-    const dispositivo =
-        dispositivos.get(deviceId);
-
-    if (dispositivo) {
-        dispositivo.ultimoContato =
-            new Date().toISOString();
-
-        dispositivos.set(
-            deviceId,
-            dispositivo
-        );
-    }
-
-    console.log(
-        "Resposta:",
-        deviceId,
-        response
-    );
-
-    res.json({
-        sucesso: true
-    });
-});
+);
 
 // ========================================
 // LISTAR DISPOSITIVOS
 // ========================================
 
-app.get("/api/devices", (req, res) => {
-    const agora = Date.now();
+app.get(
+    "/api/devices",
+    (req, res) => {
+        const agora =
+            Date.now();
 
-    const lista =
-        Array.from(
-            dispositivos.values()
-        ).map(dispositivo => {
+        const lista =
+            Array.from(
+                dispositivos.values()
+            ).map(dispositivo => {
 
-            const ultimoContato =
-                new Date(
-                    dispositivo.ultimoContato
-                ).getTime();
+                const ultimoContato =
+                    new Date(
+                        dispositivo.ultimoContato
+                    ).getTime();
 
-            const segundos =
-                (agora - ultimoContato) / 1000;
+                const segundos =
+                    (
+                        agora -
+                        ultimoContato
+                    ) / 1000;
 
-            return {
-                ...dispositivo,
+                return {
+                    ...dispositivo,
 
-                status:
-                    segundos <= 30 &&
-                    !dispositivo.revogado
-                        ? "ONLINE"
-                        : "OFFLINE"
-            };
+                    status:
+                        segundos <= 30 &&
+                        !dispositivo.revogado
+                            ? "ONLINE"
+                            : "OFFLINE"
+                };
+            });
+
+        res.set(
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate"
+        );
+
+        res.json({
+            sucesso: true,
+            dispositivos: lista
         });
-
-    res.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate"
-    );
-
-    res.json({
-        sucesso: true,
-        dispositivos: lista
-    });
-});
+    }
+);
 
 // ========================================
 // ÚLTIMA RESPOSTA
@@ -601,7 +664,8 @@ app.get(
 
         res.json({
             sucesso: true,
-            resposta: resposta || null
+            resposta:
+                resposta || null
         });
     }
 );
@@ -610,17 +674,21 @@ app.get(
 // HISTÓRICO
 // ========================================
 
-app.get("/api/history", (req, res) => {
-    res.set(
-        "Cache-Control",
-        "no-store, no-cache, must-revalidate"
-    );
+app.get(
+    "/api/history",
+    (req, res) => {
+        res.set(
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate"
+        );
 
-    res.json({
-        sucesso: true,
-        historico: historicoComandos
-    });
-});
+        res.json({
+            sucesso: true,
+            historico:
+                historicoComandos
+        });
+    }
+);
 
 // ========================================
 // REVOGAR
@@ -727,19 +795,6 @@ app.post(
 );
 
 // ========================================
-// ESCAPAR HTML
-// ========================================
-
-function escapar(valor) {
-    return String(valor ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-// ========================================
 // PAINEL
 // ========================================
 
@@ -770,24 +825,24 @@ body {
     margin: 0;
     background: #0b0f14;
     color: #ffffff;
-    font-family: Arial, Helvetica, sans-serif;
+    font-family: Arial, sans-serif;
 }
 
-.header {
-    background: #111720;
-    border-bottom: 1px solid #26303d;
+header {
+    background: #111820;
+    border-bottom: 1px solid #26303a;
     padding: 20px;
 }
 
-.header h1 {
+header h1 {
     margin: 0;
     font-size: 24px;
     letter-spacing: 2px;
 }
 
-.header p {
-    margin: 7px 0 0;
-    color: #8994a3;
+header p {
+    color: #8b98a5;
+    margin: 6px 0 0;
 }
 
 .container {
@@ -798,31 +853,31 @@ body {
 
 .tabs {
     display: flex;
-    gap: 8px;
+    gap: 10px;
     margin-bottom: 20px;
     flex-wrap: wrap;
 }
 
 .tab {
-    background: #151c25;
-    border: 1px solid #2a3543;
-    color: #aeb8c5;
+    background: #151c24;
+    color: #9aa7b3;
+    border: 1px solid #26303a;
     padding: 12px 18px;
     border-radius: 8px;
     cursor: pointer;
 }
 
 .tab.active {
-    background: #202a36;
+    background: #1d2731;
     color: #ffffff;
-    border-color: #4b5969;
+    border-color: #3b4957;
 }
 
-.page {
+.section {
     display: none;
 }
 
-.page.active {
+.section.active {
     display: block;
 }
 
@@ -835,42 +890,78 @@ body {
 }
 
 .card {
-    background: #111720;
-    border: 1px solid #26303d;
+    background: #111820;
+    border: 1px solid #26303a;
     border-radius: 10px;
     padding: 20px;
 }
 
 .card-title {
-    color: #8994a3;
+    color: #8b98a5;
     font-size: 13px;
-    margin-bottom: 10px;
+    text-transform: uppercase;
 }
 
 .card-value {
-    font-size: 30px;
-    font-weight: bold;
+    font-size: 32px;
+    margin-top: 8px;
 }
 
-.panel {
-    background: #111720;
-    border: 1px solid #26303d;
+.device {
+    background: #111820;
+    border: 1px solid #26303a;
     border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 18px;
+    margin-bottom: 12px;
 }
 
-.panel-title {
+.device-title {
     font-size: 18px;
     font-weight: bold;
-    margin-bottom: 18px;
+}
+
+.online {
+    color: #4ade80;
+}
+
+.offline {
+    color: #f87171;
+}
+
+.address {
+    color: #aeb8c2;
+    margin-top: 8px;
+}
+
+.history {
+    background: #111820;
+    border: 1px solid #26303a;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 10px;
+}
+
+.history-title {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.history-message {
+    color: #aeb8c2;
+}
+
+.form {
+    background: #111820;
+    border: 1px solid #26303a;
+    border-radius: 10px;
+    padding: 20px;
 }
 
 label {
     display: block;
-    color: #9ca8b7;
-    font-size: 13px;
-    margin-bottom: 7px;
+    margin-top: 12px;
+    margin-bottom: 6px;
+    color: #9aa7b3;
 }
 
 input,
@@ -879,10 +970,9 @@ select {
     width: 100%;
     background: #0b0f14;
     color: #ffffff;
-    border: 1px solid #303b49;
+    border: 1px solid #303b46;
     border-radius: 7px;
     padding: 12px;
-    margin-bottom: 15px;
     outline: none;
 }
 
@@ -891,113 +981,44 @@ textarea {
     resize: vertical;
 }
 
-input:focus,
-textarea:focus,
-select:focus {
-    border-color: #657487;
-}
-
-.checks {
-    display: flex;
-    gap: 25px;
-    margin: 5px 0 18px;
-    flex-wrap: wrap;
-}
-
 .check {
     display: flex;
-    align-items: center;
     gap: 8px;
-    color: #c2cad4;
+    align-items: center;
+    margin-top: 15px;
 }
 
 .check input {
     width: auto;
-    margin: 0;
 }
 
-button {
+button.send {
+    margin-top: 18px;
+    width: 100%;
+    padding: 13px;
     background: #ffffff;
     color: #0b0f14;
-    border: none;
+    border: 0;
     border-radius: 7px;
-    padding: 12px 20px;
     font-weight: bold;
     cursor: pointer;
 }
 
-button:hover {
-    opacity: 0.85;
-}
-
-.device {
-    background: #0d131b;
-    border: 1px solid #26303d;
-    border-radius: 9px;
-    padding: 16px;
-    margin-bottom: 12px;
-}
-
-.device-header {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.device-id {
-    font-weight: bold;
-    font-size: 17px;
-}
-
-.online {
-    color: #6ee7a0;
-}
-
-.offline {
-    color: #f08b8b;
-}
-
-.device-info {
-    color: #929dac;
-    margin-top: 10px;
-    line-height: 1.7;
-}
-
-.history-item {
-    border-bottom: 1px solid #26303d;
-    padding: 15px 0;
-}
-
-.history-item:last-child {
-    border-bottom: none;
-}
-
-.history-command {
-    font-weight: bold;
-    margin-bottom: 6px;
-}
-
-.history-details {
-    color: #a5afbc;
-    line-height: 1.5;
-}
-
-.history-date {
-    color: #697585;
-    font-size: 12px;
-    margin-top: 7px;
-}
-
 .empty {
+    background: #111820;
+    border: 1px solid #26303a;
+    border-radius: 10px;
+    padding: 25px;
+    color: #8b98a5;
     text-align: center;
-    color: #687483;
-    padding: 35px;
 }
 
-.status-message {
-    margin-top: 15px;
-    color: #8fdbad;
+.status {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: 7px;
+    background: #151c24;
+    color: #8b98a5;
 }
 
 </style>
@@ -1006,232 +1027,223 @@ button:hover {
 
 <body>
 
-<div class="header">
+<header>
 
-    <h1>MASTER CONTROL</h1>
+<h1>MASTER CONTROL</h1>
 
-    <p>
-        Sistema de monitoramento e controle
-    </p>
+<p>
+Sistema de monitoramento e controle
+</p>
 
-</div>
+</header>
 
 <div class="container">
 
-    <div class="tabs">
+<div class="tabs">
 
-        <button
-            class="tab active"
-            onclick="abrirAba('dispositivos', this)"
-        >
-            Dispositivos
-        </button>
+<button
+    class="tab active"
+    onclick="abrirAba('dispositivos', this)"
+>
+    Dispositivos
+</button>
 
-        <button
-            class="tab"
-            onclick="abrirAba('notificacoes', this)"
-        >
-            Notificações
-        </button>
+<button
+    class="tab"
+    onclick="abrirAba('notificacoes', this)"
+>
+    Notificações
+</button>
 
-        <button
-            class="tab"
-            onclick="abrirAba('historico', this)"
-        >
-            Histórico
-        </button>
+<button
+    class="tab"
+    onclick="abrirAba('historico', this)"
+>
+    Histórico
+</button>
 
+</div>
+
+<!-- ================================= -->
+<!-- DISPOSITIVOS -->
+<!-- ================================= -->
+
+<div
+    id="dispositivos"
+    class="section active"
+>
+
+<div class="cards">
+
+<div class="card">
+
+<div class="card-title">
+Dispositivos
+</div>
+
+<div
+    class="card-value"
+    id="total"
+>
+0
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="card-title">
+Online
+</div>
+
+<div
+    class="card-value"
+    id="online"
+>
+0
+</div>
+
+</div>
+
+<div class="card">
+
+<div class="card-title">
+Offline
+</div>
+
+<div
+    class="card-value"
+    id="offline"
+>
+0
+</div>
+
+</div>
+
+</div>
+
+<div id="listaDispositivos">
+    <div class="empty">
+        Procurando dispositivos...
     </div>
+</div>
 
-    <!-- ================================= -->
-    <!-- DISPOSITIVOS -->
-    <!-- ================================= -->
+</div>
 
-    <div
-        id="dispositivos"
-        class="page active"
-    >
+<!-- ================================= -->
+<!-- NOTIFICAÇÕES -->
+<!-- ================================= -->
 
-        <div class="cards">
+<div
+    id="notificacoes"
+    class="section"
+>
 
-            <div class="card">
+<div class="form">
 
-                <div class="card-title">
-                    DISPOSITIVOS
-                </div>
+<h2>
+Enviar notificação
+</h2>
 
-                <div
-                    class="card-value"
-                    id="total"
-                >
-                    0
-                </div>
+<label>
+Dispositivo
+</label>
 
-            </div>
+<select id="deviceSelect">
+<option value="">
+Selecione um dispositivo
+</option>
+</select>
 
-            <div class="card">
+<label>
+Título
+</label>
 
-                <div class="card-title">
-                    ONLINE
-                </div>
+<input
+    id="titulo"
+    type="text"
+    placeholder="Título da notificação"
+>
 
-                <div
-                    class="card-value"
-                    id="online"
-                >
-                    0
-                </div>
+<label>
+Mensagem
+</label>
 
-            </div>
+<textarea
+    id="mensagem"
+    placeholder="Digite a mensagem personalizada..."
+></textarea>
 
-            <div class="card">
+<div class="check">
 
-                <div class="card-title">
-                    OFFLINE
-                </div>
+<input
+    id="som"
+    type="checkbox"
+    checked
+>
 
-                <div
-                    class="card-value"
-                    id="offline"
-                >
-                    0
-                </div>
+<label
+    for="som"
+    style="margin:0"
+>
+Alerta sonoro
+</label>
 
-            </div>
+</div>
 
-        </div>
+<div class="check">
 
-        <div class="panel">
+<input
+    id="vibrar"
+    type="checkbox"
+    checked
+>
 
-            <div class="panel-title">
-                Dispositivos conectados
-            </div>
+<label
+    for="vibrar"
+    style="margin:0"
+>
+Vibração
+</label>
 
-            <div id="listaDispositivos">
-                <div class="empty">
-                    Procurando dispositivos...
-                </div>
-            </div>
+</div>
 
-        </div>
+<button
+    class="send"
+    onclick="enviarNotificacao()"
+>
+ENVIAR NOTIFICAÇÃO
+</button>
 
-    </div>
+<div
+    id="resultado"
+    class="status"
+>
+Aguardando envio.
+</div>
 
-    <!-- ================================= -->
-    <!-- NOTIFICAÇÕES -->
-    <!-- ================================= -->
+</div>
 
-    <div
-        id="notificacoes"
-        class="page"
-    >
+</div>
 
-        <div class="panel">
+<!-- ================================= -->
+<!-- HISTÓRICO -->
+<!-- ================================= -->
 
-            <div class="panel-title">
-                Enviar notificação
-            </div>
+<div
+    id="historico"
+    class="section"
+>
 
-            <label>
-                Dispositivo
-            </label>
+<div id="listaHistorico">
 
-            <select id="deviceSelect">
+<div class="empty">
+Carregando histórico...
+</div>
 
-                <option value="">
-                    Selecione um dispositivo
-                </option>
+</div>
 
-            </select>
-
-            <label>
-                Título
-            </label>
-
-            <input
-                id="titulo"
-                type="text"
-                placeholder="Título da notificação"
-            >
-
-            <label>
-                Mensagem personalizada
-            </label>
-
-            <textarea
-                id="mensagem"
-                placeholder="Digite a mensagem..."
-            ></textarea>
-
-            <div class="checks">
-
-                <label class="check">
-
-                    <input
-                        id="som"
-                        type="checkbox"
-                        checked
-                    >
-
-                    Alerta sonoro
-
-                </label>
-
-                <label class="check">
-
-                    <input
-                        id="vibrar"
-                        type="checkbox"
-                        checked
-                    >
-
-                    Vibração
-
-                </label>
-
-            </div>
-
-            <button
-                onclick="enviarNotificacao()"
-            >
-                ENVIAR NOTIFICAÇÃO
-            </button>
-
-            <div
-                id="statusEnvio"
-                class="status-message"
-            ></div>
-
-        </div>
-
-    </div>
-
-    <!-- ================================= -->
-    <!-- HISTÓRICO -->
-    <!-- ================================= -->
-
-    <div
-        id="historico"
-        class="page"
-    >
-
-        <div class="panel">
-
-            <div class="panel-title">
-                Histórico de mensagens
-            </div>
-
-            <div id="listaHistorico">
-
-                <div class="empty">
-                    Carregando histórico...
-                </div>
-
-            </div>
-
-        </div>
-
-    </div>
+</div>
 
 </div>
 
@@ -1240,14 +1252,14 @@ button:hover {
 function abrirAba(nome, botao) {
 
     document
-        .querySelectorAll(".page")
-        .forEach(function(page) {
-            page.classList.remove("active");
+        .querySelectorAll(".section")
+        .forEach(secao => {
+            secao.classList.remove("active");
         });
 
     document
         .querySelectorAll(".tab")
-        .forEach(function(tab) {
+        .forEach(tab => {
             tab.classList.remove("active");
         });
 
@@ -1256,14 +1268,6 @@ function abrirAba(nome, botao) {
         .classList.add("active");
 
     botao.classList.add("active");
-
-    if (nome === "historico") {
-        carregarHistorico();
-    }
-
-    if (nome === "notificacoes") {
-        carregarDispositivosSelect();
-    }
 }
 
 async function carregarDispositivos() {
@@ -1272,11 +1276,8 @@ async function carregarDispositivos() {
 
         const resposta =
             await fetch(
-                "/api/devices?ts=" +
-                Date.now(),
-                {
-                    cache: "no-store"
-                }
+                "/api/devices?x=" +
+                Date.now()
             );
 
         const dados =
@@ -1296,173 +1297,140 @@ async function carregarDispositivos() {
         document.getElementById(
             "online"
         ).textContent =
-            lista.filter(function(d) {
-                return d.status === "ONLINE";
-            }).length;
+            lista.filter(
+                d => d.status === "ONLINE"
+            ).length;
 
         document.getElementById(
             "offline"
         ).textContent =
-            lista.filter(function(d) {
-                return d.status === "OFFLINE";
-            }).length;
+            lista.filter(
+                d => d.status === "OFFLINE"
+            ).length;
 
         const container =
             document.getElementById(
                 "listaDispositivos"
             );
 
-        if (lista.length === 0) {
-
-            container.innerHTML =
-                '<div class="empty">' +
-                'Procurando dispositivos...' +
-                '</div>';
-
-            return;
-        }
-
-        container.innerHTML =
-            lista.map(function(d) {
-
-                const classe =
-                    d.status === "ONLINE"
-                        ? "online"
-                        : "offline";
-
-                return (
-                    '<div class="device">' +
-
-                        '<div class="device-header">' +
-
-                            '<div class="device-id">' +
-                                escapeHtml(
-                                    d.deviceId
-                                ) +
-                            '</div>' +
-
-                            '<div class="' +
-                                classe +
-                            '">' +
-                                d.status +
-                            '</div>' +
-
-                        '</div>' +
-
-                        '<div class="device-info">' +
-
-                            'Modelo: ' +
-                            escapeHtml(
-                                d.modelo || "-"
-                            ) +
-                            '<br>' +
-
-                            'Android: ' +
-                            escapeHtml(
-                                d.android || "-"
-                            ) +
-                            '<br>' +
-
-                            'Bateria: ' +
-                            (
-                                d.bateria !== null
-                                    ? d.bateria + "%"
-                                    : "-"
-                            ) +
-                            '<br>' +
-
-                            'Localização: ' +
-                            escapeHtml(
-                                d.cidade || "-"
-                            ) +
-                            (
-                                d.estado
-                                    ? " - " +
-                                      escapeHtml(
-                                          d.estado
-                                      )
-                                    : ""
-                            ) +
-
-                        '</div>' +
-
-                    '</div>'
-                );
-
-            }).join("");
-
-    } catch (erro) {
-
-        console.error(
-            "Erro ao carregar dispositivos:",
-            erro
-        );
-
-    }
-}
-
-async function carregarDispositivosSelect() {
-
-    try {
-
-        const resposta =
-            await fetch(
-                "/api/devices?ts=" +
-                Date.now(),
-                {
-                    cache: "no-store"
-                }
-            );
-
-        const dados =
-            await resposta.json();
-
-        if (!dados.sucesso) {
-            return;
-        }
-
         const select =
             document.getElementById(
                 "deviceSelect"
             );
 
-        const atual =
+        const valorAtual =
             select.value;
 
         select.innerHTML =
-            '<option value="">' +
-            'Selecione um dispositivo' +
-            '</option>';
+            '<option value="">Selecione um dispositivo</option>';
 
-        (dados.dispositivos || [])
-            .forEach(function(d) {
+        if (lista.length === 0) {
 
-                const option =
-                    document.createElement(
-                        "option"
-                    );
+            container.innerHTML =
+                '<div class="empty">Nenhum dispositivo encontrado.</div>';
 
-                option.value =
-                    d.deviceId;
+            return;
+        }
 
-                option.textContent =
-                    d.deviceId +
-                    " - " +
-                    (
-                        d.modelo ||
-                        "Dispositivo"
-                    ) +
-                    " [" +
-                    d.status +
-                    "]";
+        container.innerHTML = "";
 
-                select.appendChild(
-                    option
+        lista.forEach(dispositivo => {
+
+            const div =
+                document.createElement(
+                    "div"
                 );
-            });
 
-        if (atual) {
-            select.value = atual;
+            div.className = "device";
+
+            const endereco =
+                dispositivo.endereco ||
+                [
+                    dispositivo.bairro,
+                    dispositivo.cidade,
+                    dispositivo.estado,
+                    dispositivo.cep,
+                    dispositivo.pais
+                ]
+                .filter(Boolean)
+                .join(", ");
+
+            div.innerHTML =
+
+                '<div class="device-title">' +
+                escapeHtml(
+                    dispositivo.modelo ||
+                    dispositivo.deviceId
+                ) +
+                '</div>' +
+
+                '<div>' +
+                escapeHtml(
+                    dispositivo.deviceId
+                ) +
+                '</div>' +
+
+                '<div class="' +
+                (
+                    dispositivo.status === "ONLINE"
+                        ? "online"
+                        : "offline"
+                ) +
+                '">' +
+                escapeHtml(
+                    dispositivo.status
+                ) +
+                '</div>' +
+
+                '<div class="address">' +
+                escapeHtml(
+                    endereco ||
+                    "Endereço indisponível"
+                ) +
+                '</div>' +
+
+                '<div class="address">' +
+                'Bateria: ' +
+                escapeHtml(
+                    dispositivo.bateria ??
+                    "?"
+                ) +
+                '% | Android: ' +
+                escapeHtml(
+                    dispositivo.android ||
+                    "?"
+                ) +
+                '</div>';
+
+            container.appendChild(div);
+
+            const option =
+                document.createElement(
+                    "option"
+                );
+
+            option.value =
+                dispositivo.deviceId;
+
+            option.textContent =
+                (
+                    dispositivo.modelo ||
+                    dispositivo.deviceId
+                ) +
+                " - " +
+                dispositivo.status;
+
+            select.appendChild(option);
+        });
+
+        if (
+            lista.some(
+                d =>
+                    d.deviceId === valorAtual
+            )
+        ) {
+            select.value =
+                valorAtual;
         }
 
     } catch (erro) {
@@ -1471,7 +1439,6 @@ async function carregarDispositivosSelect() {
             "Erro ao carregar dispositivos:",
             erro
         );
-
     }
 }
 
@@ -1485,12 +1452,12 @@ async function enviarNotificacao() {
     const titulo =
         document.getElementById(
             "titulo"
-        ).value.trim();
+        ).value;
 
     const mensagem =
         document.getElementById(
             "mensagem"
-        ).value.trim();
+        ).value;
 
     const som =
         document.getElementById(
@@ -1502,28 +1469,28 @@ async function enviarNotificacao() {
             "vibrar"
         ).checked;
 
-    const status =
+    const resultado =
         document.getElementById(
-            "statusEnvio"
+            "resultado"
         );
 
     if (!deviceId) {
 
-        status.textContent =
+        resultado.textContent =
             "Selecione um dispositivo.";
 
         return;
     }
 
-    if (!mensagem) {
+    if (!mensagem.trim()) {
 
-        status.textContent =
+        resultado.textContent =
             "Digite uma mensagem.";
 
         return;
     }
 
-    status.textContent =
+    resultado.textContent =
         "Enviando...";
 
     try {
@@ -1540,7 +1507,6 @@ async function enviarNotificacao() {
                     },
 
                     body: JSON.stringify({
-
                         deviceId:
                             deviceId,
 
@@ -1558,7 +1524,6 @@ async function enviarNotificacao() {
 
                         vibrar:
                             vibrar
-
                     })
                 }
             );
@@ -1566,62 +1531,50 @@ async function enviarNotificacao() {
         const dados =
             await resposta.json();
 
-        if (!resposta.ok) {
+        if (dados.sucesso) {
 
-            status.textContent =
+            resultado.textContent =
+                "Notificação colocada na fila com sucesso.";
+
+            document.getElementById(
+                "mensagem"
+            ).value = "";
+
+        } else {
+
+            resultado.textContent =
                 dados.erro ||
                 "Erro ao enviar.";
-
-            return;
         }
 
-        status.textContent =
-            "Notificação colocada na fila.";
-
-        document.getElementById(
-            "mensagem"
-        ).value = "";
-
-        document.getElementById(
-            "titulo"
-        ).value = "";
-
-        setTimeout(
-            carregarHistorico,
-            500
-        );
+        carregarHistorico();
 
     } catch (erro) {
 
-        console.error(
-            erro
-        );
+        console.error(erro);
 
-        status.textContent =
+        resultado.textContent =
             "Erro de conexão com o servidor.";
     }
 }
 
 async function carregarHistorico() {
 
-    const container =
-        document.getElementById(
-            "listaHistorico"
-        );
-
     try {
 
         const resposta =
             await fetch(
-                "/api/history?ts=" +
-                Date.now(),
-                {
-                    cache: "no-store"
-                }
+                "/api/history?x=" +
+                Date.now()
             );
 
         const dados =
             await resposta.json();
+
+        const container =
+            document.getElementById(
+                "listaHistorico"
+            );
 
         const lista =
             dados.historico || [];
@@ -1629,58 +1582,58 @@ async function carregarHistorico() {
         if (lista.length === 0) {
 
             container.innerHTML =
-                '<div class="empty">' +
-                'Nenhuma mensagem registrada.' +
-                '</div>';
+                '<div class="empty">Nenhuma mensagem enviada.</div>';
 
             return;
         }
 
-        container.innerHTML =
-            lista
-                .filter(function(item) {
-                    return (
-                        item.command ===
-                        "NOTIFICATION"
-                    );
-                })
-                .map(function(item) {
+        container.innerHTML = "";
 
-                    return (
-                        '<div class="history-item">' +
+        lista.forEach(item => {
 
-                            '<div class="history-command">' +
-                                'NOTIFICAÇÃO — ' +
-                                escapeHtml(
-                                    item.deviceId
-                                ) +
-                            '</div>' +
+            const div =
+                document.createElement(
+                    "div"
+                );
 
-                            '<div class="history-details">' +
-                                escapeHtml(
-                                    item.detalhes
-                                ) +
-                            '</div>' +
+            div.className =
+                "history";
 
-                            '<div class="history-date">' +
-                                formatarData(
-                                    item.criadoEm
-                                ) +
-                            '</div>' +
+            const data =
+                new Date(
+                    item.criadoEm
+                ).toLocaleString(
+                    "pt-BR"
+                );
 
-                        '</div>'
-                    );
+            div.innerHTML =
 
-                })
-                .join("");
+                '<div class="history-title">' +
+                escapeHtml(
+                    item.command
+                ) +
+                '</div>' +
 
-        if (!container.innerHTML) {
+                '<div>' +
+                escapeHtml(
+                    item.deviceId
+                ) +
+                '</div>' +
 
-            container.innerHTML =
-                '<div class="empty">' +
-                'Nenhuma mensagem registrada.' +
+                '<div class="history-message">' +
+                escapeHtml(
+                    item.detalhes
+                ) +
+                '</div>' +
+
+                '<div class="history-message">' +
+                escapeHtml(
+                    data
+                ) +
                 '</div>';
-        }
+
+            container.appendChild(div);
+        });
 
     } catch (erro) {
 
@@ -1688,45 +1641,33 @@ async function carregarHistorico() {
             "Erro ao carregar histórico:",
             erro
         );
-
-        container.innerHTML =
-            '<div class="empty">' +
-            'Erro ao carregar histórico.' +
-            '</div>';
-    }
-}
-
-function formatarData(data) {
-
-    try {
-
-        return new Date(
-            data
-        ).toLocaleString(
-            "pt-BR"
-        );
-
-    } catch (_) {
-
-        return data;
     }
 }
 
 function escapeHtml(valor) {
 
-    return String(valor || "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    return String(
+        valor ?? ""
+    )
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 carregarDispositivos();
 
+carregarHistorico();
+
 setInterval(
     carregarDispositivos,
     2000
+);
+
+setInterval(
+    carregarHistorico,
+    3000
 );
 
 </script>
@@ -1735,30 +1676,33 @@ setInterval(
 
 </html>
     `);
-
 });
 
 // ========================================
 // HEALTH CHECK
 // ========================================
 
-app.get("/health", (req, res) => {
+app.get(
+    "/health",
+    (req, res) => {
 
-    res.set(
-        "Cache-Control",
-        "no-store"
-    );
+        res.set(
+            "Cache-Control",
+            "no-store"
+        );
 
-    res.json({
-        sucesso: true,
-        servidor: "MASTER CONTROL",
-        status: "ONLINE",
-        dispositivos:
-            dispositivos.size,
-        hora:
-            new Date().toISOString()
-    });
-});
+        res.json({
+            sucesso: true,
+            servidor:
+                "MASTER CONTROL",
+            status: "ONLINE",
+            dispositivos:
+                dispositivos.size,
+            hora:
+                new Date().toISOString()
+        });
+    }
+);
 
 // ========================================
 // INICIAR SERVIDOR
@@ -1770,19 +1714,46 @@ app.listen(
     () => {
 
         console.log("");
-        console.log("========================================");
-        console.log("          MASTER CONTROL");
-        console.log("========================================");
-        console.log("Servidor iniciado");
-        console.log("Porta:", PORT);
-        console.log("Painel: /");
-        console.log("Health: /health");
-        console.log("Notificações: ATIVADAS");
-        console.log("Som: ATIVADO");
-        console.log("Vibração: ATIVADA");
-        console.log("Histórico: ATIVADO");
-        console.log("Atualização: 2 segundos");
-        console.log("Aguardando dispositivos...");
+        console.log(
+            "========================================"
+        );
+        console.log(
+            "          MASTER CONTROL"
+        );
+        console.log(
+            "========================================"
+        );
+        console.log(
+            "Servidor iniciado"
+        );
+        console.log(
+            "Porta:",
+            PORT
+        );
+        console.log(
+            "Painel: /"
+        );
+        console.log(
+            "Health: /health"
+        );
+        console.log(
+            "Notificações: ATIVADAS"
+        );
+        console.log(
+            "Som: ATIVADO"
+        );
+        console.log(
+            "Vibração: ATIVADA"
+        );
+        console.log(
+            "Histórico: ATIVADO"
+        );
+        console.log(
+            "Atualização: 2 segundos"
+        );
+        console.log(
+            "Aguardando dispositivos..."
+        );
         console.log("");
     }
 );
