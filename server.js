@@ -204,7 +204,7 @@ app.post("/api/device", async (req, res) => {
         );
 
         // ========================================
-        // BUSCAR ENDEREÇO COMPLETO
+        // ATUALIZAR ENDEREÇO
         // ========================================
 
         if (
@@ -276,6 +276,10 @@ app.post("/api/device", async (req, res) => {
             }
         }
 
+        // ========================================
+        // LOG
+        // ========================================
+
         console.log("");
         console.log(
             "========================================"
@@ -286,7 +290,10 @@ app.post("/api/device", async (req, res) => {
         console.log(
             "========================================"
         );
-        console.log("ID:", deviceId);
+        console.log(
+            "ID:",
+            deviceId
+        );
         console.log(
             "Modelo:",
             dispositivo.modelo
@@ -348,19 +355,19 @@ app.post("/api/command", (req, res) => {
     if (!deviceId || !command) {
         return res.status(400).json({
             sucesso: false,
-            erro: "deviceId e command são obrigatórios"
+            erro:
+                "deviceId e command são obrigatórios"
         });
     }
 
     const comandosPermitidos = [
         "STATUS",
         "MESSAGE",
-        "NOTIFICATION"
+        "NOTIFICATION",
+        "LOCK_SCREEN"
     ];
 
-    if (
-        !comandosPermitidos.includes(command)
-    ) {
+    if (!comandosPermitidos.includes(command)) {
         return res.status(400).json({
             sucesso: false,
             erro: "Comando não permitido"
@@ -403,16 +410,23 @@ app.post("/api/command", (req, res) => {
 
     const comando = {
         command: command,
-        titulo: titulo || "",
-        mensagem: mensagem || "",
+
+        titulo:
+            titulo || "",
+
+        mensagem:
+            mensagem || "",
+
         som:
             typeof som === "boolean"
                 ? som
                 : true,
+
         vibrar:
             typeof vibrar === "boolean"
                 ? vibrar
                 : true,
+
         criadoEm:
             new Date().toISOString()
     };
@@ -429,6 +443,9 @@ app.post("/api/command", (req, res) => {
             (titulo || "Nova mensagem") +
             " | Mensagem: " +
             mensagem;
+    } else if (command === "LOCK_SCREEN") {
+        detalhes =
+            "Solicitação para bloquear a tela";
     } else {
         detalhes =
             mensagem || "";
@@ -439,6 +456,10 @@ app.post("/api/command", (req, res) => {
         command,
         detalhes
     );
+
+    // ========================================
+    // LOG DO COMANDO
+    // ========================================
 
     console.log("");
     console.log(
@@ -458,6 +479,12 @@ app.post("/api/command", (req, res) => {
         "Comando:",
         command
     );
+
+    if (command === "LOCK_SCREEN") {
+        console.log(
+            "Ação: BLOQUEAR TELA"
+        );
+    }
 
     if (command === "NOTIFICATION") {
         console.log(
@@ -524,8 +551,7 @@ app.get(
         }
 
         const fila =
-            comandosPendentes.get(deviceId) ||
-            [];
+            comandosPendentes.get(deviceId) || [];
 
         if (fila.length === 0) {
             return res.json({
@@ -614,29 +640,30 @@ app.get(
         const lista =
             Array.from(
                 dispositivos.values()
-            ).map(dispositivo => {
+            ).map(
+                dispositivo => {
+                    const ultimoContato =
+                        new Date(
+                            dispositivo.ultimoContato
+                        ).getTime();
 
-                const ultimoContato =
-                    new Date(
-                        dispositivo.ultimoContato
-                    ).getTime();
+                    const segundos =
+                        (
+                            agora -
+                            ultimoContato
+                        ) / 1000;
 
-                const segundos =
-                    (
-                        agora -
-                        ultimoContato
-                    ) / 1000;
+                    return {
+                        ...dispositivo,
 
-                return {
-                    ...dispositivo,
-
-                    status:
-                        segundos <= 30 &&
-                        !dispositivo.revogado
-                            ? "ONLINE"
-                            : "OFFLINE"
-                };
-            });
+                        status:
+                            segundos <= 30 &&
+                            !dispositivo.revogado
+                                ? "ONLINE"
+                                : "OFFLINE"
+                    };
+                }
+            );
 
         res.set(
             "Cache-Control",
@@ -697,8 +724,9 @@ app.get(
 app.post(
     "/api/device/revoke",
     (req, res) => {
-        const { deviceId } =
-            req.body || {};
+        const {
+            deviceId
+        } = req.body || {};
 
         if (!deviceId) {
             return res.status(400).json({
@@ -751,8 +779,9 @@ app.post(
 app.post(
     "/api/device/unrevoke",
     (req, res) => {
-        const { deviceId } =
-            req.body || {};
+        const {
+            deviceId
+        } = req.body || {};
 
         if (!deviceId) {
             return res.status(400).json({
@@ -799,7 +828,6 @@ app.post(
 // ========================================
 
 app.get("/", (req, res) => {
-
     res.send(`
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -813,7 +841,7 @@ app.get("/", (req, res) => {
     content="width=device-width, initial-scale=1.0"
 >
 
-<title>MASTER CONTROL</title>
+<title>Master Control</title>
 
 <style>
 
@@ -823,32 +851,18 @@ app.get("/", (req, res) => {
 
 body {
     margin: 0;
-    background: #0b0f14;
+    padding: 20px;
+    background: #0f1115;
     color: #ffffff;
     font-family: Arial, sans-serif;
 }
 
-header {
-    background: #111820;
-    border-bottom: 1px solid #26303a;
-    padding: 20px;
+h1 {
+    margin-top: 0;
 }
 
-header h1 {
-    margin: 0;
-    font-size: 24px;
-    letter-spacing: 2px;
-}
-
-header p {
-    color: #8b98a5;
-    margin: 6px 0 0;
-}
-
-.container {
-    max-width: 1200px;
-    margin: auto;
-    padding: 20px;
+button {
+    cursor: pointer;
 }
 
 .tabs {
@@ -859,166 +873,93 @@ header p {
 }
 
 .tab {
-    background: #151c24;
-    color: #9aa7b3;
-    border: 1px solid #26303a;
+    background: #22262e;
+    color: white;
+    border: 0;
     padding: 12px 18px;
     border-radius: 8px;
-    cursor: pointer;
 }
 
 .tab.active {
-    background: #1d2731;
-    color: #ffffff;
-    border-color: #3b4957;
+    background: #3b82f6;
 }
 
-.section {
+.aba {
     display: none;
 }
 
-.section.active {
+.aba.active {
     display: block;
-}
-
-.cards {
-    display: grid;
-    grid-template-columns:
-        repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
-    margin-bottom: 20px;
 }
 
 .card {
-    background: #111820;
-    border: 1px solid #26303a;
-    border-radius: 10px;
-    padding: 20px;
-}
-
-.card-title {
-    color: #8b98a5;
-    font-size: 13px;
-    text-transform: uppercase;
-}
-
-.card-value {
-    font-size: 32px;
-    margin-top: 8px;
-}
-
-.device {
-    background: #111820;
-    border: 1px solid #26303a;
-    border-radius: 10px;
+    background: #191d24;
+    border: 1px solid #2b3039;
+    border-radius: 12px;
     padding: 18px;
-    margin-bottom: 12px;
-}
-
-.device-title {
-    font-size: 18px;
-    font-weight: bold;
+    margin-bottom: 15px;
 }
 
 .online {
-    color: #4ade80;
+    color: #22c55e;
+    font-weight: bold;
 }
 
 .offline {
-    color: #f87171;
-}
-
-.address {
-    color: #aeb8c2;
-    margin-top: 8px;
-}
-
-.history {
-    background: #111820;
-    border: 1px solid #26303a;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 10px;
-}
-
-.history-title {
+    color: #ef4444;
     font-weight: bold;
-    margin-bottom: 6px;
-}
-
-.history-message {
-    color: #aeb8c2;
-}
-
-.form {
-    background: #111820;
-    border: 1px solid #26303a;
-    border-radius: 10px;
-    padding: 20px;
-}
-
-label {
-    display: block;
-    margin-top: 12px;
-    margin-bottom: 6px;
-    color: #9aa7b3;
 }
 
 input,
-textarea,
-select {
+textarea {
     width: 100%;
-    background: #0b0f14;
-    color: #ffffff;
-    border: 1px solid #303b46;
-    border-radius: 7px;
+    background: #111318;
+    color: white;
+    border: 1px solid #343944;
+    border-radius: 8px;
     padding: 12px;
-    outline: none;
+    margin-bottom: 10px;
 }
 
 textarea {
-    min-height: 120px;
+    min-height: 100px;
     resize: vertical;
 }
 
-.check {
+.send {
+    background: #3b82f6;
+    color: white;
+    border: 0;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+}
+
+.lock {
+    background: #dc2626;
+    color: white;
+    border: 0;
+    padding: 12px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+    margin-top: 10px;
+}
+
+.small {
+    color: #a1a1aa;
+    font-size: 13px;
+}
+
+.checkbox {
     display: flex;
     gap: 8px;
     align-items: center;
-    margin-top: 15px;
+    margin-bottom: 10px;
 }
 
-.check input {
+.checkbox input {
     width: auto;
-}
-
-button.send {
-    margin-top: 18px;
-    width: 100%;
-    padding: 13px;
-    background: #ffffff;
-    color: #0b0f14;
-    border: 0;
-    border-radius: 7px;
-    font-weight: bold;
-    cursor: pointer;
-}
-
-.empty {
-    background: #111820;
-    border: 1px solid #26303a;
-    border-radius: 10px;
-    padding: 25px;
-    color: #8b98a5;
-    text-align: center;
-}
-
-.status {
-    margin-top: 12px;
-    padding: 10px;
-    border-radius: 7px;
-    background: #151c24;
-    color: #8b98a5;
+    margin: 0;
 }
 
 </style>
@@ -1027,17 +968,7 @@ button.send {
 
 <body>
 
-<header>
-
-<h1>MASTER CONTROL</h1>
-
-<p>
-Sistema de monitoramento e controle
-</p>
-
-</header>
-
-<div class="container">
+<h1>Master Control</h1>
 
 <div class="tabs">
 
@@ -1064,202 +995,127 @@ Sistema de monitoramento e controle
 
 </div>
 
-<!-- ================================= -->
-<!-- DISPOSITIVOS -->
-<!-- ================================= -->
+<!-- =====================================
+     DISPOSITIVOS
+===================================== -->
 
 <div
     id="dispositivos"
-    class="section active"
+    class="aba active"
 >
 
-<div class="cards">
-
-<div class="card">
-
-<div class="card-title">
-Dispositivos
-</div>
-
-<div
-    class="card-value"
-    id="total"
->
-0
-</div>
-
-</div>
-
-<div class="card">
-
-<div class="card-title">
-Online
-</div>
-
-<div
-    class="card-value"
-    id="online"
->
-0
-</div>
-
-</div>
-
-<div class="card">
-
-<div class="card-title">
-Offline
-</div>
-
-<div
-    class="card-value"
-    id="offline"
->
-0
-</div>
-
-</div>
-
-</div>
-
-<div id="listaDispositivos">
-    <div class="empty">
-        Procurando dispositivos...
+    <div id="listaDispositivos">
+        Carregando dispositivos...
     </div>
-</div>
 
 </div>
 
-<!-- ================================= -->
-<!-- NOTIFICAÇÕES -->
-<!-- ================================= -->
+<!-- =====================================
+     NOTIFICAÇÕES
+===================================== -->
 
 <div
     id="notificacoes"
-    class="section"
+    class="aba"
 >
 
-<div class="form">
+    <div class="card">
 
-<h2>
-Enviar notificação
-</h2>
+        <h2>Enviar notificação</h2>
 
-<label>
-Dispositivo
-</label>
+        <input
+            id="deviceNotificacao"
+            type="text"
+            placeholder="ID do dispositivo"
+        >
 
-<select id="deviceSelect">
-<option value="">
-Selecione um dispositivo
-</option>
-</select>
+        <input
+            id="titulo"
+            type="text"
+            placeholder="Título da notificação"
+        >
 
-<label>
-Título
-</label>
+        <textarea
+            id="mensagem"
+            placeholder="Mensagem"
+        ></textarea>
 
-<input
-    id="titulo"
-    type="text"
-    placeholder="Título da notificação"
->
+        <label class="checkbox">
 
-<label>
-Mensagem
-</label>
+            <input
+                id="som"
+                type="checkbox"
+                checked
+            >
 
-<textarea
-    id="mensagem"
-    placeholder="Digite a mensagem personalizada..."
-></textarea>
+            Som
 
-<div class="check">
+        </label>
 
-<input
-    id="som"
-    type="checkbox"
-    checked
->
+        <label class="checkbox">
 
-<label
-    for="som"
-    style="margin:0"
->
-Alerta sonoro
-</label>
+            <input
+                id="vibrar"
+                type="checkbox"
+                checked
+            >
+
+            Vibração
+
+        </label>
+
+        <button
+            class="send"
+            onclick="enviarNotificacao()"
+        >
+            ENVIAR NOTIFICAÇÃO
+        </button>
+
+    </div>
 
 </div>
 
-<div class="check">
-
-<input
-    id="vibrar"
-    type="checkbox"
-    checked
->
-
-<label
-    for="vibrar"
-    style="margin:0"
->
-Vibração
-</label>
-
-</div>
-
-<button
-    class="send"
-    onclick="enviarNotificacao()"
->
-ENVIAR NOTIFICAÇÃO
-</button>
-
-<div
-    id="resultado"
-    class="status"
->
-Aguardando envio.
-</div>
-
-</div>
-
-</div>
-
-<!-- ================================= -->
-<!-- HISTÓRICO -->
-<!-- ================================= -->
+<!-- =====================================
+     HISTÓRICO
+===================================== -->
 
 <div
     id="historico"
-    class="section"
+    class="aba"
 >
 
-<div id="listaHistorico">
-
-<div class="empty">
-Carregando histórico...
-</div>
-
-</div>
-
-</div>
+    <div id="listaHistorico">
+        Carregando histórico...
+    </div>
 
 </div>
 
 <script>
 
+function escaparJS(valor) {
+    return String(valor ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+// ========================================
+// ABAS
+// ========================================
+
 function abrirAba(nome, botao) {
 
     document
-        .querySelectorAll(".section")
-        .forEach(secao => {
-            secao.classList.remove("active");
+        .querySelectorAll(".aba")
+        .forEach(function(aba) {
+            aba.classList.remove("active");
         });
 
     document
         .querySelectorAll(".tab")
-        .forEach(tab => {
+        .forEach(function(tab) {
             tab.classList.remove("active");
         });
 
@@ -1268,7 +1124,16 @@ function abrirAba(nome, botao) {
         .classList.add("active");
 
     botao.classList.add("active");
+
+    if (nome === "historico") {
+        carregarHistorico();
+    }
+
 }
+
+// ========================================
+// CARREGAR DISPOSITIVOS
+// ========================================
 
 async function carregarDispositivos() {
 
@@ -1276,222 +1141,154 @@ async function carregarDispositivos() {
 
         const resposta =
             await fetch(
-                "/api/devices?x=" +
-                Date.now()
+                "/api/devices",
+                {
+                    cache: "no-store"
+                }
             );
 
         const dados =
             await resposta.json();
 
-        if (!dados.sucesso) {
-            return;
-        }
-
         const lista =
-            dados.dispositivos || [];
-
-        document.getElementById(
-            "total"
-        ).textContent = lista.length;
-
-        document.getElementById(
-            "online"
-        ).textContent =
-            lista.filter(
-                d => d.status === "ONLINE"
-            ).length;
-
-        document.getElementById(
-            "offline"
-        ).textContent =
-            lista.filter(
-                d => d.status === "OFFLINE"
-            ).length;
-
-        const container =
             document.getElementById(
                 "listaDispositivos"
             );
 
-        const select =
-            document.getElementById(
-                "deviceSelect"
-            );
-
-        const valorAtual =
-            select.value;
-
-        select.innerHTML =
-            '<option value="">Selecione um dispositivo</option>';
-
-        if (lista.length === 0) {
-
-            container.innerHTML =
-                '<div class="empty">Nenhum dispositivo encontrado.</div>';
+        if (
+            !dados.sucesso ||
+            !Array.isArray(dados.dispositivos)
+        ) {
+            lista.innerHTML =
+                "<p>Erro ao carregar dispositivos.</p>";
 
             return;
         }
 
-        container.innerHTML = "";
+        if (dados.dispositivos.length === 0) {
 
-        lista.forEach(dispositivo => {
+            lista.innerHTML =
+                "<p>Nenhum dispositivo conectado.</p>";
 
-            const div =
-                document.createElement(
-                    "div"
-                );
-
-            div.className = "device";
-
-            const endereco =
-                dispositivo.endereco ||
-                [
-                    dispositivo.bairro,
-                    dispositivo.cidade,
-                    dispositivo.estado,
-                    dispositivo.cep,
-                    dispositivo.pais
-                ]
-                .filter(Boolean)
-                .join(", ");
-
-            div.innerHTML =
-
-                '<div class="device-title">' +
-                escapeHtml(
-                    dispositivo.modelo ||
-                    dispositivo.deviceId
-                ) +
-                '</div>' +
-
-                '<div>' +
-                escapeHtml(
-                    dispositivo.deviceId
-                ) +
-                '</div>' +
-
-                '<div class="' +
-                (
-                    dispositivo.status === "ONLINE"
-                        ? "online"
-                        : "offline"
-                ) +
-                '">' +
-                escapeHtml(
-                    dispositivo.status
-                ) +
-                '</div>' +
-
-                '<div class="address">' +
-                escapeHtml(
-                    endereco ||
-                    "Endereço indisponível"
-                ) +
-                '</div>' +
-
-                '<div class="address">' +
-                'Bateria: ' +
-                escapeHtml(
-                    dispositivo.bateria ??
-                    "?"
-                ) +
-                '% | Android: ' +
-                escapeHtml(
-                    dispositivo.android ||
-                    "?"
-                ) +
-                '</div>';
-
-            container.appendChild(div);
-
-            const option =
-                document.createElement(
-                    "option"
-                );
-
-            option.value =
-                dispositivo.deviceId;
-
-            option.textContent =
-                (
-                    dispositivo.modelo ||
-                    dispositivo.deviceId
-                ) +
-                " - " +
-                dispositivo.status;
-
-            select.appendChild(option);
-        });
-
-        if (
-            lista.some(
-                d =>
-                    d.deviceId === valorAtual
-            )
-        ) {
-            select.value =
-                valorAtual;
+            return;
         }
+
+        lista.innerHTML =
+            dados.dispositivos
+                .map(function(dispositivo) {
+
+                    const id =
+                        String(
+                            dispositivo.deviceId
+                        );
+
+                    const idSeguro =
+                        escaparJS(id);
+
+                    const status =
+                        dispositivo.status || "OFFLINE";
+
+                    const classeStatus =
+                        status === "ONLINE"
+                            ? "online"
+                            : "offline";
+
+                    return \`
+<div class="card">
+
+    <h2>
+        \${escaparJS(
+            dispositivo.modelo ||
+            dispositivo.deviceId
+        )}
+    </h2>
+
+    <p>
+        <strong>ID:</strong><br>
+        \${escaparJS(
+            dispositivo.deviceId
+        )}
+    </p>
+
+    <p>
+        <strong>Status:</strong><br>
+        <span class="\${classeStatus}">
+            \${escaparJS(status)}
+        </span>
+    </p>
+
+    <p>
+        <strong>Bateria:</strong><br>
+        \${escaparJS(
+            dispositivo.bateria ?? "N/A"
+        )}%
+    </p>
+
+    <p>
+        <strong>Android:</strong><br>
+        \${escaparJS(
+            dispositivo.android || "N/A"
+        )}
+    </p>
+
+    <p>
+        <strong>IP:</strong><br>
+        \${escaparJS(
+            dispositivo.ip || "N/A"
+        )}
+    </p>
+
+    <p>
+        <strong>Localização:</strong><br>
+        \${escaparJS(
+            dispositivo.endereco ||
+            "Não disponível"
+        )}
+    </p>
+
+    <button
+        class="lock"
+        onclick="bloquearTela('\${encodeURIComponent(idSeguro)}')"
+    >
+        BLOQUEAR TELA
+    </button>
+
+</div>
+\`;
+
+                })
+                .join("");
 
     } catch (erro) {
 
-        console.error(
-            "Erro ao carregar dispositivos:",
-            erro
-        );
+        console.error(erro);
+
+        document.getElementById(
+            "listaDispositivos"
+        ).innerHTML =
+            "<p>Erro de conexão com o servidor.</p>";
+
     }
+
 }
 
-async function enviarNotificacao() {
+// ========================================
+// BLOQUEAR TELA
+// ========================================
 
-    const deviceId =
-        document.getElementById(
-            "deviceSelect"
-        ).value;
+async function bloquearTela(deviceId) {
 
-    const titulo =
-        document.getElementById(
-            "titulo"
-        ).value;
+    const id =
+        decodeURIComponent(deviceId);
 
-    const mensagem =
-        document.getElementById(
-            "mensagem"
-        ).value;
-
-    const som =
-        document.getElementById(
-            "som"
-        ).checked;
-
-    const vibrar =
-        document.getElementById(
-            "vibrar"
-        ).checked;
-
-    const resultado =
-        document.getElementById(
-            "resultado"
+    const confirmar =
+        confirm(
+            "Deseja enviar o comando para bloquear a tela deste dispositivo?"
         );
 
-    if (!deviceId) {
-
-        resultado.textContent =
-            "Selecione um dispositivo.";
-
+    if (!confirmar) {
         return;
     }
-
-    if (!mensagem.trim()) {
-
-        resultado.textContent =
-            "Digite uma mensagem.";
-
-        return;
-    }
-
-    resultado.textContent =
-        "Enviando...";
 
     try {
 
@@ -1507,23 +1304,8 @@ async function enviarNotificacao() {
                     },
 
                     body: JSON.stringify({
-                        deviceId:
-                            deviceId,
-
-                        command:
-                            "NOTIFICATION",
-
-                        titulo:
-                            titulo,
-
-                        mensagem:
-                            mensagem,
-
-                        som:
-                            som,
-
-                        vibrar:
-                            vibrar
+                        deviceId: id,
+                        command: "LOCK_SCREEN"
                     })
                 }
             );
@@ -1531,32 +1313,141 @@ async function enviarNotificacao() {
         const dados =
             await resposta.json();
 
-        if (dados.sucesso) {
+        if (!resposta.ok) {
 
-            resultado.textContent =
-                "Notificação colocada na fila com sucesso.";
-
-            document.getElementById(
-                "mensagem"
-            ).value = "";
-
-        } else {
-
-            resultado.textContent =
+            alert(
                 dados.erro ||
-                "Erro ao enviar.";
+                "Não foi possível enviar o comando."
+            );
+
+            return;
         }
 
-        carregarHistorico();
+        alert(
+            "Comando de bloqueio enviado."
+        );
 
     } catch (erro) {
 
         console.error(erro);
 
-        resultado.textContent =
-            "Erro de conexão com o servidor.";
+        alert(
+            "Erro de conexão com o servidor."
+        );
+
     }
+
 }
+
+// ========================================
+// ENVIAR NOTIFICAÇÃO
+// ========================================
+
+async function enviarNotificacao() {
+
+    const deviceId =
+        document.getElementById(
+            "deviceNotificacao"
+        ).value.trim();
+
+    const titulo =
+        document.getElementById(
+            "titulo"
+        ).value.trim();
+
+    const mensagem =
+        document.getElementById(
+            "mensagem"
+        ).value.trim();
+
+    const som =
+        document.getElementById(
+            "som"
+        ).checked;
+
+    const vibrar =
+        document.getElementById(
+            "vibrar"
+        ).checked;
+
+    if (!deviceId) {
+
+        alert(
+            "Informe o ID do dispositivo."
+        );
+
+        return;
+    }
+
+    if (!mensagem) {
+
+        alert(
+            "Informe uma mensagem."
+        );
+
+        return;
+    }
+
+    try {
+
+        const resposta =
+            await fetch(
+                "/api/command",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        deviceId: deviceId,
+                        command: "NOTIFICATION",
+                        titulo: titulo,
+                        mensagem: mensagem,
+                        som: som,
+                        vibrar: vibrar
+                    })
+                }
+            );
+
+        const dados =
+            await resposta.json();
+
+        if (!resposta.ok) {
+
+            alert(
+                dados.erro ||
+                "Erro ao enviar notificação."
+            );
+
+            return;
+        }
+
+        alert(
+            "Notificação enviada para a fila."
+        );
+
+        document.getElementById(
+            "mensagem"
+        ).value = "";
+
+    } catch (erro) {
+
+        console.error(erro);
+
+        alert(
+            "Erro de conexão com o servidor."
+        );
+
+    }
+
+}
+
+// ========================================
+// HISTÓRICO
+// ========================================
 
 async function carregarHistorico() {
 
@@ -1564,110 +1455,99 @@ async function carregarHistorico() {
 
         const resposta =
             await fetch(
-                "/api/history?x=" +
-                Date.now()
+                "/api/history",
+                {
+                    cache: "no-store"
+                }
             );
 
         const dados =
             await resposta.json();
 
-        const container =
+        const lista =
             document.getElementById(
                 "listaHistorico"
             );
 
-        const lista =
-            dados.historico || [];
+        if (
+            !dados.sucesso ||
+            !Array.isArray(dados.historico)
+        ) {
 
-        if (lista.length === 0) {
-
-            container.innerHTML =
-                '<div class="empty">Nenhuma mensagem enviada.</div>';
+            lista.innerHTML =
+                "<p>Erro ao carregar histórico.</p>";
 
             return;
         }
 
-        container.innerHTML = "";
+        if (dados.historico.length === 0) {
 
-        lista.forEach(item => {
+            lista.innerHTML =
+                "<p>Nenhum comando registrado.</p>";
 
-            const div =
-                document.createElement(
-                    "div"
-                );
+            return;
+        }
 
-            div.className =
-                "history";
+        lista.innerHTML =
+            dados.historico
+                .map(function(item) {
 
-            const data =
-                new Date(
-                    item.criadoEm
-                ).toLocaleString(
-                    "pt-BR"
-                );
+                    return \`
+<div class="card">
 
-            div.innerHTML =
+    <strong>
+        \${escaparJS(
+            item.command
+        )}
+    </strong>
 
-                '<div class="history-title">' +
-                escapeHtml(
-                    item.command
-                ) +
-                '</div>' +
+    <p>
+        Dispositivo:
+        \${escaparJS(
+            item.deviceId
+        )}
+    </p>
 
-                '<div>' +
-                escapeHtml(
-                    item.deviceId
-                ) +
-                '</div>' +
+    <p>
+        \${escaparJS(
+            item.detalhes
+        )}
+    </p>
 
-                '<div class="history-message">' +
-                escapeHtml(
-                    item.detalhes
-                ) +
-                '</div>' +
+    <span class="small">
+        \${escaparJS(
+            item.criadoEm
+        )}
+    </span>
 
-                '<div class="history-message">' +
-                escapeHtml(
-                    data
-                ) +
-                '</div>';
+</div>
+\`;
 
-            container.appendChild(div);
-        });
+                })
+                .join("");
 
     } catch (erro) {
 
-        console.error(
-            "Erro ao carregar histórico:",
-            erro
-        );
+        console.error(erro);
+
+        document.getElementById(
+            "listaHistorico"
+        ).innerHTML =
+            "<p>Erro ao carregar histórico.</p>";
+
     }
+
 }
 
-function escapeHtml(valor) {
-
-    return String(
-        valor ?? ""
-    )
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
+// ========================================
+// ATUALIZAÇÃO AUTOMÁTICA
+// ========================================
 
 carregarDispositivos();
 
-carregarHistorico();
-
 setInterval(
     carregarDispositivos,
-    2000
-);
-
-setInterval(
-    carregarHistorico,
-    3000
+    5000
 );
 
 </script>
@@ -1679,81 +1559,35 @@ setInterval(
 });
 
 // ========================================
-// HEALTH CHECK
-// ========================================
-
-app.get(
-    "/health",
-    (req, res) => {
-
-        res.set(
-            "Cache-Control",
-            "no-store"
-        );
-
-        res.json({
-            sucesso: true,
-            servidor:
-                "MASTER CONTROL",
-            status: "ONLINE",
-            dispositivos:
-                dispositivos.size,
-            hora:
-                new Date().toISOString()
-        });
-    }
-);
-
-// ========================================
 // INICIAR SERVIDOR
 // ========================================
 
-app.listen(
-    PORT,
-    "0.0.0.0",
-    () => {
+app.listen(PORT, () => {
 
-        console.log("");
-        console.log(
-            "========================================"
-        );
-        console.log(
-            "          MASTER CONTROL"
-        );
-        console.log(
-            "========================================"
-        );
-        console.log(
-            "Servidor iniciado"
-        );
-        console.log(
-            "Porta:",
-            PORT
-        );
-        console.log(
-            "Painel: /"
-        );
-        console.log(
-            "Health: /health"
-        );
-        console.log(
-            "Notificações: ATIVADAS"
-        );
-        console.log(
-            "Som: ATIVADO"
-        );
-        console.log(
-            "Vibração: ATIVADA"
-        );
-        console.log(
-            "Histórico: ATIVADO"
-        );
-        console.log(
-            "Atualização: 2 segundos"
-        );
-        console.log(
-            "Aguardando dispositivos..."
-        );
-        console.log("");
-    }
-);
+    console.log("");
+    console.log(
+        "========================================"
+    );
+    console.log(
+        "        MASTER CONTROL ONLINE"
+    );
+    console.log(
+        "========================================"
+    );
+    console.log(
+        "Porta:",
+        PORT
+    );
+    console.log(
+        "Painel:",
+        "http://localhost:" + PORT
+    );
+    console.log(
+        "Bloqueio de tela: ATIVADO"
+    );
+    console.log(
+        "========================================"
+    );
+    console.log("");
+
+});
