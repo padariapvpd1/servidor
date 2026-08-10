@@ -35,7 +35,9 @@ async function buscarEndereco(latitude, longitude) {
     });
 
     if (!resposta.ok) {
-        throw new Error("Nominatim HTTP " + resposta.status);
+        throw new Error(
+            "Nominatim HTTP " + resposta.status
+        );
     }
 
     return await resposta.json();
@@ -45,11 +47,15 @@ async function buscarEndereco(latitude, longitude) {
 // HISTÓRICO
 // ========================================
 
-function registrarComando(deviceId, command, detalhes = "") {
+function registrarComando(
+    deviceId,
+    command,
+    detalhes = ""
+) {
     historicoComandos.unshift({
-        deviceId,
-        command,
-        detalhes,
+        deviceId: deviceId,
+        command: command,
+        detalhes: detalhes,
         criadoEm: new Date().toISOString()
     });
 
@@ -71,7 +77,10 @@ app.post("/api/device", async (req, res) => {
             req.socket.remoteAddress ||
             "Desconhecido";
 
-        if (typeof ip === "string" && ip.includes(",")) {
+        if (
+            typeof ip === "string" &&
+            ip.includes(",")
+        ) {
             ip = ip.split(",")[0].trim();
         }
 
@@ -82,10 +91,11 @@ app.post("/api/device", async (req, res) => {
             dados.id ||
             "dispositivo-" + ip;
 
-        const anterior = dispositivos.get(deviceId);
+        const anterior =
+            dispositivos.get(deviceId);
 
         const dispositivo = {
-            deviceId,
+            deviceId: deviceId,
 
             marca:
                 dados.marca ||
@@ -107,7 +117,7 @@ app.post("/api/device", async (req, res) => {
                 anterior?.android ||
                 "",
 
-            ip,
+            ip: ip,
 
             bateria:
                 typeof dados.bateria === "number"
@@ -175,7 +185,10 @@ app.post("/api/device", async (req, res) => {
                 new Date().toISOString()
         };
 
-        dispositivos.set(deviceId, dispositivo);
+        dispositivos.set(
+            deviceId,
+            dispositivo
+        );
 
         // ========================================
         // BUSCAR ENDEREÇO
@@ -187,14 +200,17 @@ app.post("/api/device", async (req, res) => {
             dispositivo.localizacaoDisponivel !== false
         ) {
             try {
-                const endereco = await buscarEndereco(
-                    dispositivo.latitude,
-                    dispositivo.longitude
-                );
+                const endereco =
+                    await buscarEndereco(
+                        dispositivo.latitude,
+                        dispositivo.longitude
+                    );
 
-                const address = endereco.address || {};
+                const address =
+                    endereco.address || {};
 
-                const atual = dispositivos.get(deviceId);
+                const atual =
+                    dispositivos.get(deviceId);
 
                 if (atual) {
                     atual.bairro =
@@ -232,7 +248,10 @@ app.post("/api/device", async (req, res) => {
                         atual.endereco ||
                         "";
 
-                    dispositivos.set(deviceId, atual);
+                    dispositivos.set(
+                        deviceId,
+                        atual
+                    );
                 }
             } catch (erro) {
                 console.error(
@@ -260,7 +279,7 @@ app.post("/api/device", async (req, res) => {
 
         res.json({
             sucesso: true,
-            deviceId
+            deviceId: deviceId
         });
 
     } catch (erro) {
@@ -285,7 +304,9 @@ app.post("/api/command", (req, res) => {
         deviceId,
         command,
         titulo,
-        mensagem
+        mensagem,
+        som,
+        vibrar
     } = req.body || {};
 
     if (!deviceId || !command) {
@@ -308,7 +329,8 @@ app.post("/api/command", (req, res) => {
         });
     }
 
-    const dispositivo = dispositivos.get(deviceId);
+    const dispositivo =
+        dispositivos.get(deviceId);
 
     if (!dispositivo) {
         return res.status(404).json({
@@ -335,14 +357,26 @@ app.post("/api/command", (req, res) => {
     }
 
     if (!comandosPendentes.has(deviceId)) {
-        comandosPendentes.set(deviceId, []);
+        comandosPendentes.set(
+            deviceId,
+            []
+        );
     }
 
     const comando = {
-        command,
+        command: command,
         titulo: titulo || "",
         mensagem: mensagem || "",
-        criadoEm: new Date().toISOString()
+        som:
+            typeof som === "boolean"
+                ? som
+                : true,
+        vibrar:
+            typeof vibrar === "boolean"
+                ? vibrar
+                : true,
+        criadoEm:
+            new Date().toISOString()
     };
 
     comandosPendentes
@@ -356,7 +390,11 @@ app.post("/api/command", (req, res) => {
             "Título: " +
             (titulo || "Nova notificação") +
             " | Mensagem: " +
-            mensagem;
+            mensagem +
+            " | Som: " +
+            (comando.som ? "SIM" : "NÃO") +
+            " | Vibração: " +
+            (comando.vibrar ? "SIM" : "NÃO");
     } else {
         detalhes = mensagem || "";
     }
@@ -384,6 +422,16 @@ app.post("/api/command", (req, res) => {
             "Mensagem:",
             mensagem
         );
+
+        console.log(
+            "Som:",
+            comando.som
+        );
+
+        console.log(
+            "Vibração:",
+            comando.vibrar
+        );
     }
 
     console.log("========================================");
@@ -399,43 +447,49 @@ app.post("/api/command", (req, res) => {
 // ANDROID BUSCA COMANDO
 // ========================================
 
-app.get("/api/command/:deviceId", (req, res) => {
-    const deviceId = req.params.deviceId;
+app.get(
+    "/api/command/:deviceId",
+    (req, res) => {
+        const deviceId =
+            req.params.deviceId;
 
-    const dispositivo = dispositivos.get(deviceId);
+        const dispositivo =
+            dispositivos.get(deviceId);
 
-    if (!dispositivo) {
-        return res.status(404).json({
-            sucesso: false,
-            erro: "Dispositivo não encontrado"
-        });
-    }
+        if (!dispositivo) {
+            return res.status(404).json({
+                sucesso: false,
+                erro: "Dispositivo não encontrado"
+            });
+        }
 
-    if (dispositivo.revogado) {
-        return res.status(403).json({
-            sucesso: false,
-            erro: "Dispositivo revogado",
-            comando: null
-        });
-    }
+        if (dispositivo.revogado) {
+            return res.status(403).json({
+                sucesso: false,
+                erro: "Dispositivo revogado",
+                comando: null
+            });
+        }
 
-    const fila =
-        comandosPendentes.get(deviceId) || [];
+        const fila =
+            comandosPendentes.get(deviceId) || [];
 
-    if (fila.length === 0) {
-        return res.json({
+        if (fila.length === 0) {
+            return res.json({
+                sucesso: true,
+                comando: null
+            });
+        }
+
+        const comando =
+            fila.shift();
+
+        res.json({
             sucesso: true,
-            comando: null
+            comando: comando
         });
     }
-
-    const comando = fila.shift();
-
-    res.json({
-        sucesso: true,
-        comando
-    });
-});
+);
 
 // ========================================
 // RECEBER RESPOSTA
@@ -461,8 +515,9 @@ app.post("/api/response", (req, res) => {
     respostasDispositivos.set(
         deviceId,
         {
-            response,
-            recebidoEm: new Date().toISOString()
+            response: response,
+            recebidoEm:
+                new Date().toISOString()
         }
     );
 
@@ -536,17 +591,20 @@ app.get("/api/devices", (req, res) => {
 // ÚLTIMA RESPOSTA
 // ========================================
 
-app.get("/api/response/:deviceId", (req, res) => {
-    const resposta =
-        respostasDispositivos.get(
-            req.params.deviceId
-        );
+app.get(
+    "/api/response/:deviceId",
+    (req, res) => {
+        const resposta =
+            respostasDispositivos.get(
+                req.params.deviceId
+            );
 
-    res.json({
-        sucesso: true,
-        resposta: resposta || null
-    });
-});
+        res.json({
+            sucesso: true,
+            resposta: resposta || null
+        });
+    }
+);
 
 // ========================================
 // HISTÓRICO
@@ -568,89 +626,105 @@ app.get("/api/history", (req, res) => {
 // REVOGAR
 // ========================================
 
-app.post("/api/device/revoke", (req, res) => {
-    const { deviceId } = req.body || {};
+app.post(
+    "/api/device/revoke",
+    (req, res) => {
+        const { deviceId } =
+            req.body || {};
 
-    if (!deviceId) {
-        return res.status(400).json({
-            sucesso: false,
-            erro: "deviceId é obrigatório"
+        if (!deviceId) {
+            return res.status(400).json({
+                sucesso: false,
+                erro:
+                    "deviceId é obrigatório"
+            });
+        }
+
+        const dispositivo =
+            dispositivos.get(deviceId);
+
+        if (!dispositivo) {
+            return res.status(404).json({
+                sucesso: false,
+                erro:
+                    "Dispositivo não encontrado"
+            });
+        }
+
+        dispositivo.revogado = true;
+
+        dispositivos.set(
+            deviceId,
+            dispositivo
+        );
+
+        comandosPendentes.delete(
+            deviceId
+        );
+
+        registrarComando(
+            deviceId,
+            "REVOKE",
+            "Dispositivo revogado"
+        );
+
+        res.json({
+            sucesso: true,
+            mensagem:
+                "Dispositivo revogado"
         });
     }
-
-    const dispositivo =
-        dispositivos.get(deviceId);
-
-    if (!dispositivo) {
-        return res.status(404).json({
-            sucesso: false,
-            erro: "Dispositivo não encontrado"
-        });
-    }
-
-    dispositivo.revogado = true;
-
-    dispositivos.set(
-        deviceId,
-        dispositivo
-    );
-
-    comandosPendentes.delete(deviceId);
-
-    registrarComando(
-        deviceId,
-        "REVOKE",
-        "Dispositivo revogado"
-    );
-
-    res.json({
-        sucesso: true,
-        mensagem: "Dispositivo revogado"
-    });
-});
+);
 
 // ========================================
 // REATIVAR
 // ========================================
 
-app.post("/api/device/unrevoke", (req, res) => {
-    const { deviceId } = req.body || {};
+app.post(
+    "/api/device/unrevoke",
+    (req, res) => {
+        const { deviceId } =
+            req.body || {};
 
-    if (!deviceId) {
-        return res.status(400).json({
-            sucesso: false,
-            erro: "deviceId é obrigatório"
+        if (!deviceId) {
+            return res.status(400).json({
+                sucesso: false,
+                erro:
+                    "deviceId é obrigatório"
+            });
+        }
+
+        const dispositivo =
+            dispositivos.get(deviceId);
+
+        if (!dispositivo) {
+            return res.status(404).json({
+                sucesso: false,
+                erro:
+                    "Dispositivo não encontrado"
+            });
+        }
+
+        dispositivo.revogado = false;
+
+        dispositivos.set(
+            deviceId,
+            dispositivo
+        );
+
+        registrarComando(
+            deviceId,
+            "UNREVOKE",
+            "Dispositivo reativado"
+        );
+
+        res.json({
+            sucesso: true,
+            mensagem:
+                "Dispositivo reativado"
         });
     }
-
-    const dispositivo =
-        dispositivos.get(deviceId);
-
-    if (!dispositivo) {
-        return res.status(404).json({
-            sucesso: false,
-            erro: "Dispositivo não encontrado"
-        });
-    }
-
-    dispositivo.revogado = false;
-
-    dispositivos.set(
-        deviceId,
-        dispositivo
-    );
-
-    registrarComando(
-        deviceId,
-        "UNREVOKE",
-        "Dispositivo reativado"
-    );
-
-    res.json({
-        sucesso: true,
-        mensagem: "Dispositivo reativado"
-    });
-});
+);
 
 // ========================================
 // ESCAPAR HTML
@@ -694,85 +768,236 @@ app.get("/", (req, res) => {
 
 body {
     margin: 0;
+    background: #0b0f14;
+    color: #ffffff;
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+.header {
+    background: #111720;
+    border-bottom: 1px solid #26303d;
     padding: 20px;
-    background: #111;
-    color: #fff;
-    font-family: Arial, sans-serif;
 }
 
-h1 {
-    margin-bottom: 25px;
+.header h1 {
+    margin: 0;
+    font-size: 24px;
+    letter-spacing: 2px;
 }
 
-.cards {
+.header p {
+    margin: 7px 0 0;
+    color: #8994a3;
+}
+
+.container {
+    max-width: 1200px;
+    margin: auto;
+    padding: 20px;
+}
+
+.tabs {
     display: flex;
-    gap: 15px;
+    gap: 8px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
 }
 
+.tab {
+    background: #151c25;
+    border: 1px solid #2a3543;
+    color: #aeb8c5;
+    padding: 12px 18px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.tab.active {
+    background: #202a36;
+    color: #ffffff;
+    border-color: #4b5969;
+}
+
+.page {
+    display: none;
+}
+
+.page.active {
+    display: block;
+}
+
+.cards {
+    display: grid;
+    grid-template-columns:
+        repeat(auto-fit, minmax(180px, 1fr));
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
 .card {
-    background: #1d1d1d;
-    border: 1px solid #333;
-    border-radius: 12px;
+    background: #111720;
+    border: 1px solid #26303d;
+    border-radius: 10px;
     padding: 20px;
-    min-width: 180px;
 }
 
 .card-title {
-    color: #aaa;
-    font-size: 14px;
+    color: #8994a3;
+    font-size: 13px;
+    margin-bottom: 10px;
 }
 
 .card-value {
-    font-size: 32px;
-    margin-top: 8px;
+    font-size: 30px;
+    font-weight: bold;
 }
 
-#devices {
-    margin-top: 30px;
-}
-
-.device {
-    background: #1d1d1d;
-    border: 1px solid #333;
-    border-radius: 12px;
+.panel {
+    background: #111720;
+    border: 1px solid #26303d;
+    border-radius: 10px;
     padding: 20px;
+    margin-bottom: 20px;
+}
+
+.panel-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 18px;
+}
+
+label {
+    display: block;
+    color: #9ca8b7;
+    font-size: 13px;
+    margin-bottom: 7px;
+}
+
+input,
+textarea,
+select {
+    width: 100%;
+    background: #0b0f14;
+    color: #ffffff;
+    border: 1px solid #303b49;
+    border-radius: 7px;
+    padding: 12px;
     margin-bottom: 15px;
+    outline: none;
 }
 
-.device h2 {
-    margin-top: 0;
+textarea {
+    min-height: 120px;
+    resize: vertical;
 }
 
-.online {
-    color: #00ff88;
-    font-weight: bold;
+input:focus,
+textarea:focus,
+select:focus {
+    border-color: #657487;
 }
 
-.offline {
-    color: #ff5555;
-    font-weight: bold;
+.checks {
+    display: flex;
+    gap: 25px;
+    margin: 5px 0 18px;
+    flex-wrap: wrap;
 }
 
-.info {
-    margin-top: 8px;
-    color: #ccc;
+.check {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #c2cad4;
 }
 
-.empty {
-    background: #1d1d1d;
-    border: 1px solid #333;
-    border-radius: 12px;
-    padding: 20px;
-    color: #aaa;
+.check input {
+    width: auto;
+    margin: 0;
 }
 
 button {
-    margin-top: 15px;
-    padding: 10px 15px;
-    border: 0;
-    border-radius: 8px;
+    background: #ffffff;
+    color: #0b0f14;
+    border: none;
+    border-radius: 7px;
+    padding: 12px 20px;
+    font-weight: bold;
     cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+.device {
+    background: #0d131b;
+    border: 1px solid #26303d;
+    border-radius: 9px;
+    padding: 16px;
+    margin-bottom: 12px;
+}
+
+.device-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.device-id {
+    font-weight: bold;
+    font-size: 17px;
+}
+
+.online {
+    color: #6ee7a0;
+}
+
+.offline {
+    color: #f08b8b;
+}
+
+.device-info {
+    color: #929dac;
+    margin-top: 10px;
+    line-height: 1.7;
+}
+
+.history-item {
+    border-bottom: 1px solid #26303d;
+    padding: 15px 0;
+}
+
+.history-item:last-child {
+    border-bottom: none;
+}
+
+.history-command {
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.history-details {
+    color: #a5afbc;
+    line-height: 1.5;
+}
+
+.history-date {
+    color: #697585;
+    font-size: 12px;
+    margin-top: 7px;
+}
+
+.empty {
+    text-align: center;
+    color: #687483;
+    padding: 35px;
+}
+
+.status-message {
+    margin-top: 15px;
+    color: #8fdbad;
 }
 
 </style>
@@ -781,104 +1006,285 @@ button {
 
 <body>
 
-<h1>MASTER CONTROL</h1>
+<div class="header">
 
-<div class="cards">
+    <h1>MASTER CONTROL</h1>
 
-    <div class="card">
-        <div class="card-title">
-            DISPOSITIVOS
-        </div>
-
-        <div
-            class="card-value"
-            id="total"
-        >
-            0
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            ONLINE
-        </div>
-
-        <div
-            class="card-value"
-            id="online"
-        >
-            0
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-title">
-            OFFLINE
-        </div>
-
-        <div
-            class="card-value"
-            id="offline"
-        >
-            0
-        </div>
-    </div>
+    <p>
+        Sistema de monitoramento e controle
+    </p>
 
 </div>
 
-<h2>Dispositivos</h2>
+<div class="container">
 
-<div id="devices">
+    <div class="tabs">
 
-    <div class="empty">
-        Procurando dispositivos...
+        <button
+            class="tab active"
+            onclick="abrirAba('dispositivos', this)"
+        >
+            Dispositivos
+        </button>
+
+        <button
+            class="tab"
+            onclick="abrirAba('notificacoes', this)"
+        >
+            Notificações
+        </button>
+
+        <button
+            class="tab"
+            onclick="abrirAba('historico', this)"
+        >
+            Histórico
+        </button>
+
     </div>
 
-</div>
+    <!-- ================================= -->
+    <!-- DISPOSITIVOS -->
+    <!-- ================================= -->
 
-<h2>Histórico</h2>
+    <div
+        id="dispositivos"
+        class="page active"
+    >
 
-<div id="historyList">
+        <div class="cards">
 
-    <div class="empty">
-        Nenhum comando registrado.
+            <div class="card">
+
+                <div class="card-title">
+                    DISPOSITIVOS
+                </div>
+
+                <div
+                    class="card-value"
+                    id="total"
+                >
+                    0
+                </div>
+
+            </div>
+
+            <div class="card">
+
+                <div class="card-title">
+                    ONLINE
+                </div>
+
+                <div
+                    class="card-value"
+                    id="online"
+                >
+                    0
+                </div>
+
+            </div>
+
+            <div class="card">
+
+                <div class="card-title">
+                    OFFLINE
+                </div>
+
+                <div
+                    class="card-value"
+                    id="offline"
+                >
+                    0
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="panel">
+
+            <div class="panel-title">
+                Dispositivos conectados
+            </div>
+
+            <div id="listaDispositivos">
+                <div class="empty">
+                    Procurando dispositivos...
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ================================= -->
+    <!-- NOTIFICAÇÕES -->
+    <!-- ================================= -->
+
+    <div
+        id="notificacoes"
+        class="page"
+    >
+
+        <div class="panel">
+
+            <div class="panel-title">
+                Enviar notificação
+            </div>
+
+            <label>
+                Dispositivo
+            </label>
+
+            <select id="deviceSelect">
+
+                <option value="">
+                    Selecione um dispositivo
+                </option>
+
+            </select>
+
+            <label>
+                Título
+            </label>
+
+            <input
+                id="titulo"
+                type="text"
+                placeholder="Título da notificação"
+            >
+
+            <label>
+                Mensagem personalizada
+            </label>
+
+            <textarea
+                id="mensagem"
+                placeholder="Digite a mensagem..."
+            ></textarea>
+
+            <div class="checks">
+
+                <label class="check">
+
+                    <input
+                        id="som"
+                        type="checkbox"
+                        checked
+                    >
+
+                    Alerta sonoro
+
+                </label>
+
+                <label class="check">
+
+                    <input
+                        id="vibrar"
+                        type="checkbox"
+                        checked
+                    >
+
+                    Vibração
+
+                </label>
+
+            </div>
+
+            <button
+                onclick="enviarNotificacao()"
+            >
+                ENVIAR NOTIFICAÇÃO
+            </button>
+
+            <div
+                id="statusEnvio"
+                class="status-message"
+            ></div>
+
+        </div>
+
+    </div>
+
+    <!-- ================================= -->
+    <!-- HISTÓRICO -->
+    <!-- ================================= -->
+
+    <div
+        id="historico"
+        class="page"
+    >
+
+        <div class="panel">
+
+            <div class="panel-title">
+                Histórico de mensagens
+            </div>
+
+            <div id="listaHistorico">
+
+                <div class="empty">
+                    Carregando histórico...
+                </div>
+
+            </div>
+
+        </div>
+
     </div>
 
 </div>
 
 <script>
 
-function escaparHTML(valor) {
+function abrirAba(nome, botao) {
 
-    return String(valor ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
+    document
+        .querySelectorAll(".page")
+        .forEach(function(page) {
+            page.classList.remove("active");
+        });
+
+    document
+        .querySelectorAll(".tab")
+        .forEach(function(tab) {
+            tab.classList.remove("active");
+        });
+
+    document
+        .getElementById(nome)
+        .classList.add("active");
+
+    botao.classList.add("active");
+
+    if (nome === "historico") {
+        carregarHistorico();
+    }
+
+    if (nome === "notificacoes") {
+        carregarDispositivosSelect();
+    }
 }
 
-async function atualizarDispositivos() {
+async function carregarDispositivos() {
 
     try {
 
         const resposta =
             await fetch(
-                "/api/devices?t=" +
+                "/api/devices?ts=" +
                 Date.now(),
                 {
                     cache: "no-store"
                 }
             );
 
-        if (!resposta.ok) {
-            throw new Error(
-                "HTTP " + resposta.status
-            );
-        }
-
         const dados =
             await resposta.json();
+
+        if (!dados.sucesso) {
+            return;
+        }
 
         const lista =
             dados.dispositivos || [];
@@ -890,144 +1296,324 @@ async function atualizarDispositivos() {
         document.getElementById(
             "online"
         ).textContent =
-            lista.filter(
-                d => d.status === "ONLINE"
-            ).length;
+            lista.filter(function(d) {
+                return d.status === "ONLINE";
+            }).length;
 
         document.getElementById(
             "offline"
         ).textContent =
-            lista.filter(
-                d => d.status === "OFFLINE"
-            ).length;
+            lista.filter(function(d) {
+                return d.status === "OFFLINE";
+            }).length;
 
         const container =
             document.getElementById(
-                "devices"
+                "listaDispositivos"
             );
 
         if (lista.length === 0) {
 
-            container.innerHTML = \`
-                <div class="empty">
-                    Nenhum dispositivo conectado.
-                </div>
-            \`;
+            container.innerHTML =
+                '<div class="empty">' +
+                'Procurando dispositivos...' +
+                '</div>';
 
             return;
         }
 
         container.innerHTML =
-            lista.map(dispositivo => {
+            lista.map(function(d) {
 
-                const statusClass =
-                    dispositivo.status === "ONLINE"
+                const classe =
+                    d.status === "ONLINE"
                         ? "online"
                         : "offline";
 
-                const bateria =
-                    dispositivo.bateria !== null
-                        ? dispositivo.bateria + "%"
-                        : "N/A";
+                return (
+                    '<div class="device">' +
 
-                const carregando =
-                    dispositivo.carregando === true
-                        ? "Sim"
-                        : dispositivo.carregando === false
-                            ? "Não"
-                            : "N/A";
+                        '<div class="device-header">' +
 
-                const localizacao =
-                    dispositivo.latitude !== null &&
-                    dispositivo.longitude !== null
-                        ? dispositivo.latitude +
-                          ", " +
-                          dispositivo.longitude
-                        : "Indisponível";
+                            '<div class="device-id">' +
+                                escapeHtml(
+                                    d.deviceId
+                                ) +
+                            '</div>' +
 
-                const endereco =
-                    dispositivo.endereco ||
-                    "Endereço não disponível";
+                            '<div class="' +
+                                classe +
+                            '">' +
+                                d.status +
+                            '</div>' +
 
-                return \`
-                    <div class="device">
+                        '</div>' +
 
-                        <h2>
-                            \${escaparHTML(
-                                dispositivo.deviceId
-                            )}
-                        </h2>
+                        '<div class="device-info">' +
 
-                        <div class="\${statusClass}">
-                            \${escaparHTML(
-                                dispositivo.status
-                            )}
-                        </div>
+                            'Modelo: ' +
+                            escapeHtml(
+                                d.modelo || "-"
+                            ) +
+                            '<br>' +
 
-                        <div class="info">
-                            Modelo:
-                            \${escaparHTML(
-                                dispositivo.modelo
-                            )}
-                        </div>
+                            'Android: ' +
+                            escapeHtml(
+                                d.android || "-"
+                            ) +
+                            '<br>' +
 
-                        <div class="info">
-                            Android:
-                            \${escaparHTML(
-                                dispositivo.android
-                            )}
-                        </div>
+                            'Bateria: ' +
+                            (
+                                d.bateria !== null
+                                    ? d.bateria + "%"
+                                    : "-"
+                            ) +
+                            '<br>' +
 
-                        <div class="info">
-                            Bateria:
-                            \${escaparHTML(
-                                bateria
-                            )}
-                        </div>
+                            'Localização: ' +
+                            escapeHtml(
+                                d.cidade || "-"
+                            ) +
+                            (
+                                d.estado
+                                    ? " - " +
+                                      escapeHtml(
+                                          d.estado
+                                      )
+                                    : ""
+                            ) +
 
-                        <div class="info">
-                            Carregando:
-                            \${escaparHTML(
-                                carregando
-                            )}
-                        </div>
+                        '</div>' +
 
-                        <div class="info">
-                            Localização:
-                            \${escaparHTML(
-                                localizacao
-                            )}
-                        </div>
-
-                        <div class="info">
-                            Endereço:
-                            \${escaparHTML(
-                                endereco
-                            )}
-                        </div>
-
-                    </div>
-                \`;
+                    '</div>'
+                );
 
             }).join("");
 
     } catch (erro) {
 
         console.error(
-            "Erro ao atualizar dispositivos:",
+            "Erro ao carregar dispositivos:",
             erro
         );
 
     }
 }
 
-async function atualizarHistorico() {
+async function carregarDispositivosSelect() {
 
     try {
 
         const resposta =
             await fetch(
-                "/api/history?t=" +
+                "/api/devices?ts=" +
+                Date.now(),
+                {
+                    cache: "no-store"
+                }
+            );
+
+        const dados =
+            await resposta.json();
+
+        if (!dados.sucesso) {
+            return;
+        }
+
+        const select =
+            document.getElementById(
+                "deviceSelect"
+            );
+
+        const atual =
+            select.value;
+
+        select.innerHTML =
+            '<option value="">' +
+            'Selecione um dispositivo' +
+            '</option>';
+
+        (dados.dispositivos || [])
+            .forEach(function(d) {
+
+                const option =
+                    document.createElement(
+                        "option"
+                    );
+
+                option.value =
+                    d.deviceId;
+
+                option.textContent =
+                    d.deviceId +
+                    " - " +
+                    (
+                        d.modelo ||
+                        "Dispositivo"
+                    ) +
+                    " [" +
+                    d.status +
+                    "]";
+
+                select.appendChild(
+                    option
+                );
+            });
+
+        if (atual) {
+            select.value = atual;
+        }
+
+    } catch (erro) {
+
+        console.error(
+            "Erro ao carregar dispositivos:",
+            erro
+        );
+
+    }
+}
+
+async function enviarNotificacao() {
+
+    const deviceId =
+        document.getElementById(
+            "deviceSelect"
+        ).value;
+
+    const titulo =
+        document.getElementById(
+            "titulo"
+        ).value.trim();
+
+    const mensagem =
+        document.getElementById(
+            "mensagem"
+        ).value.trim();
+
+    const som =
+        document.getElementById(
+            "som"
+        ).checked;
+
+    const vibrar =
+        document.getElementById(
+            "vibrar"
+        ).checked;
+
+    const status =
+        document.getElementById(
+            "statusEnvio"
+        );
+
+    if (!deviceId) {
+
+        status.textContent =
+            "Selecione um dispositivo.";
+
+        return;
+    }
+
+    if (!mensagem) {
+
+        status.textContent =
+            "Digite uma mensagem.";
+
+        return;
+    }
+
+    status.textContent =
+        "Enviando...";
+
+    try {
+
+        const resposta =
+            await fetch(
+                "/api/command",
+                {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body: JSON.stringify({
+
+                        deviceId:
+                            deviceId,
+
+                        command:
+                            "NOTIFICATION",
+
+                        titulo:
+                            titulo,
+
+                        mensagem:
+                            mensagem,
+
+                        som:
+                            som,
+
+                        vibrar:
+                            vibrar
+
+                    })
+                }
+            );
+
+        const dados =
+            await resposta.json();
+
+        if (!resposta.ok) {
+
+            status.textContent =
+                dados.erro ||
+                "Erro ao enviar.";
+
+            return;
+        }
+
+        status.textContent =
+            "Notificação colocada na fila.";
+
+        document.getElementById(
+            "mensagem"
+        ).value = "";
+
+        document.getElementById(
+            "titulo"
+        ).value = "";
+
+        setTimeout(
+            carregarHistorico,
+            500
+        );
+
+    } catch (erro) {
+
+        console.error(
+            erro
+        );
+
+        status.textContent =
+            "Erro de conexão com o servidor.";
+    }
+}
+
+async function carregarHistorico() {
+
+    const container =
+        document.getElementById(
+            "listaHistorico"
+        );
+
+    try {
+
+        const resposta =
+            await fetch(
+                "/api/history?ts=" +
                 Date.now(),
                 {
                     cache: "no-store"
@@ -1040,74 +1626,106 @@ async function atualizarHistorico() {
         const lista =
             dados.historico || [];
 
-        const container =
-            document.getElementById(
-                "historyList"
-            );
-
         if (lista.length === 0) {
 
-            container.innerHTML = \`
-                <div class="empty">
-                    Nenhum comando registrado.
-                </div>
-            \`;
+            container.innerHTML =
+                '<div class="empty">' +
+                'Nenhuma mensagem registrada.' +
+                '</div>';
 
             return;
         }
 
         container.innerHTML =
             lista
-                .slice(0, 50)
-                .map(item => \`
+                .filter(function(item) {
+                    return (
+                        item.command ===
+                        "NOTIFICATION"
+                    );
+                })
+                .map(function(item) {
 
-                    <div class="device">
+                    return (
+                        '<div class="history-item">' +
 
-                        <strong>
-                            \${escaparHTML(
-                                item.command
-                            )}
-                        </strong>
+                            '<div class="history-command">' +
+                                'NOTIFICAÇÃO — ' +
+                                escapeHtml(
+                                    item.deviceId
+                                ) +
+                            '</div>' +
 
-                        <div class="info">
-                            Dispositivo:
-                            \${escaparHTML(
-                                item.deviceId
-                            )}
-                        </div>
+                            '<div class="history-details">' +
+                                escapeHtml(
+                                    item.detalhes
+                                ) +
+                            '</div>' +
 
-                        <div class="info">
-                            \${escaparHTML(
-                                item.detalhes
-                            )}
-                        </div>
+                            '<div class="history-date">' +
+                                formatarData(
+                                    item.criadoEm
+                                ) +
+                            '</div>' +
 
-                    </div>
+                        '</div>'
+                    );
 
-                \`)
+                })
                 .join("");
+
+        if (!container.innerHTML) {
+
+            container.innerHTML =
+                '<div class="empty">' +
+                'Nenhuma mensagem registrada.' +
+                '</div>';
+        }
 
     } catch (erro) {
 
         console.error(
-            "Erro ao atualizar histórico:",
+            "Erro ao carregar histórico:",
             erro
         );
 
+        container.innerHTML =
+            '<div class="empty">' +
+            'Erro ao carregar histórico.' +
+            '</div>';
     }
 }
 
-atualizarDispositivos();
+function formatarData(data) {
 
-atualizarHistorico();
+    try {
+
+        return new Date(
+            data
+        ).toLocaleString(
+            "pt-BR"
+        );
+
+    } catch (_) {
+
+        return data;
+    }
+}
+
+function escapeHtml(valor) {
+
+    return String(valor || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+}
+
+carregarDispositivos();
 
 setInterval(
-    atualizarDispositivos,
-    2000
-);
-
-setInterval(
-    atualizarHistorico,
+    carregarDispositivos,
     2000
 );
 
@@ -1116,7 +1734,7 @@ setInterval(
 </body>
 
 </html>
-`);
+    `);
 
 });
 
@@ -1135,8 +1753,10 @@ app.get("/health", (req, res) => {
         sucesso: true,
         servidor: "MASTER CONTROL",
         status: "ONLINE",
-        dispositivos: dispositivos.size,
-        hora: new Date().toISOString()
+        dispositivos:
+            dispositivos.size,
+        hora:
+            new Date().toISOString()
     });
 });
 
@@ -1158,6 +1778,9 @@ app.listen(
         console.log("Painel: /");
         console.log("Health: /health");
         console.log("Notificações: ATIVADAS");
+        console.log("Som: ATIVADO");
+        console.log("Vibração: ATIVADA");
+        console.log("Histórico: ATIVADO");
         console.log("Atualização: 2 segundos");
         console.log("Aguardando dispositivos...");
         console.log("");
