@@ -10,9 +10,9 @@ const PORT = process.env.PORT || 10000;
 // MEMÓRIA
 // ========================================
 
+const dispositivos = new Map();
 const comandosPendentes = new Map();
 const respostasDispositivos = new Map();
-const dispositivos = new Map();
 const historicoComandos = [];
 
 // ========================================
@@ -21,22 +21,22 @@ const historicoComandos = [];
 
 async function buscarEndereco(latitude, longitude) {
     const url =
-        `https://nominatim.openstreetmap.org/reverse` +
-        `?format=jsonv2` +
-        `&lat=${encodeURIComponent(latitude)}` +
-        `&lon=${encodeURIComponent(longitude)}` +
-        `&zoom=18` +
-        `&addressdetails=1`;
+        "https://nominatim.openstreetmap.org/reverse" +
+        "?format=jsonv2" +
+        "&lat=" + encodeURIComponent(latitude) +
+        "&lon=" + encodeURIComponent(longitude) +
+        "&zoom=18" +
+        "&addressdetails=1";
 
     const resposta = await fetch(url, {
         headers: {
-            "User-Agent": "ServidorAndroid/1.0"
+            "User-Agent": "MasterControl/1.0"
         }
     });
 
     if (!resposta.ok) {
         throw new Error(
-            `Nominatim respondeu HTTP ${resposta.status}`
+            "Nominatim respondeu HTTP " + resposta.status
         );
     }
 
@@ -44,14 +44,14 @@ async function buscarEndereco(latitude, longitude) {
 }
 
 // ========================================
-// REGISTRAR HISTÓRICO
+// HISTÓRICO
 // ========================================
 
-function registrarComando(deviceId, command, detalhes = "") {
+function registrarHistorico(deviceId, command, detalhes) {
     historicoComandos.unshift({
-        deviceId,
-        command,
-        detalhes,
+        deviceId: deviceId,
+        command: command,
+        detalhes: detalhes || "",
         criadoEm: new Date().toISOString()
     });
 
@@ -82,86 +82,85 @@ app.post("/api/device", async (req, res) => {
         const deviceId =
             dados.deviceId ||
             dados.id ||
-            `dispositivo-${ip}`;
+            "dispositivo-" + ip;
 
-        const dispositivoAnterior =
-            dispositivos.get(deviceId);
+        const anterior = dispositivos.get(deviceId);
 
         const dispositivo = {
-            deviceId,
+            deviceId: deviceId,
 
-            marca: dados.marca || "",
-            fabricante: dados.fabricante || "",
-            modelo: dados.modelo || "",
-            android: dados.android || "",
+            marca: dados.marca || anterior?.marca || "",
+            fabricante: dados.fabricante || anterior?.fabricante || "",
+            modelo: dados.modelo || anterior?.modelo || "",
+            android: dados.android || anterior?.android || "",
 
-            ip,
+            ip: ip,
 
             bateria:
                 typeof dados.bateria === "number"
                     ? dados.bateria
-                    : dispositivoAnterior?.bateria ?? null,
+                    : anterior?.bateria ?? null,
 
             carregando:
                 typeof dados.carregando === "boolean"
                     ? dados.carregando
-                    : dispositivoAnterior?.carregando ?? null,
+                    : anterior?.carregando ?? null,
 
             armazenamentoLivre:
                 typeof dados.armazenamentoLivre === "number"
                     ? dados.armazenamentoLivre
-                    : dispositivoAnterior?.armazenamentoLivre ?? null,
+                    : anterior?.armazenamentoLivre ?? null,
 
             armazenamentoTotal:
                 typeof dados.armazenamentoTotal === "number"
                     ? dados.armazenamentoTotal
-                    : dispositivoAnterior?.armazenamentoTotal ?? null,
+                    : anterior?.armazenamentoTotal ?? null,
 
             latitude:
                 typeof dados.latitude === "number"
                     ? dados.latitude
-                    : dispositivoAnterior?.latitude ?? null,
+                    : anterior?.latitude ?? null,
 
             longitude:
                 typeof dados.longitude === "number"
                     ? dados.longitude
-                    : dispositivoAnterior?.longitude ?? null,
+                    : anterior?.longitude ?? null,
 
             bairro:
                 dados.bairro ||
-                dispositivoAnterior?.bairro ||
+                anterior?.bairro ||
                 "",
 
             cidade:
                 dados.cidade ||
-                dispositivoAnterior?.cidade ||
+                anterior?.cidade ||
                 "",
 
             estado:
                 dados.estado ||
-                dispositivoAnterior?.estado ||
+                anterior?.estado ||
                 "",
 
             cep:
                 dados.cep ||
-                dispositivoAnterior?.cep ||
+                anterior?.cep ||
                 "",
 
             pais:
                 dados.pais ||
-                dispositivoAnterior?.pais ||
+                anterior?.pais ||
                 "",
 
             endereco:
                 dados.endereco ||
-                dispositivoAnterior?.endereco ||
+                anterior?.endereco ||
                 "",
 
             revogado:
-                dispositivoAnterior?.revogado || false,
+                anterior?.revogado || false,
 
             primeiroContato:
-                dispositivoAnterior?.primeiroContato ||
+                anterior?.primeiroContato ||
                 new Date().toISOString(),
 
             ultimoContato:
@@ -179,7 +178,7 @@ app.post("/api/device", async (req, res) => {
         console.log("Fabricante:  ", dispositivo.fabricante);
         console.log("Modelo:      ", dispositivo.modelo);
         console.log("Android:     ", dispositivo.android);
-        console.log("IP:          ", ip);
+        console.log("IP:          ", dispositivo.ip);
         console.log("Bateria:     ", dispositivo.bateria);
         console.log("Latitude:    ", dispositivo.latitude);
         console.log("Longitude:   ", dispositivo.longitude);
@@ -188,7 +187,7 @@ app.post("/api/device", async (req, res) => {
         console.log("");
 
         // ========================================
-        // LOCALIZAÇÃO
+        // BUSCAR ENDEREÇO
         // ========================================
 
         if (
@@ -244,7 +243,7 @@ app.post("/api/device", async (req, res) => {
                 }
             } catch (erro) {
                 console.error(
-                    "Erro ao consultar localização:",
+                    "Erro ao buscar endereço:",
                     erro.message
                 );
             }
@@ -252,12 +251,12 @@ app.post("/api/device", async (req, res) => {
 
         res.status(200).json({
             sucesso: true,
-            deviceId
+            deviceId: deviceId
         });
 
     } catch (erro) {
         console.error(
-            "Erro ao processar dispositivo:",
+            "Erro em /api/device:",
             erro
         );
 
@@ -275,8 +274,7 @@ app.post("/api/device", async (req, res) => {
 app.post("/api/command", (req, res) => {
     const {
         deviceId,
-        command,
-        mensagem
+        command
     } = req.body || {};
 
     if (!deviceId || !command) {
@@ -286,11 +284,9 @@ app.post("/api/command", (req, res) => {
         });
     }
 
+    // SOMENTE STATUS POR ENQUANTO
     const comandosPermitidos = [
-        "PING",
-        "STATUS",
-        "MESSAGE",
-        "NOTIFICATION"
+        "STATUS"
     ];
 
     if (!comandosPermitidos.includes(command)) {
@@ -321,17 +317,16 @@ app.post("/api/command", (req, res) => {
     }
 
     const comando = {
-        command,
-        mensagem: mensagem || "",
+        command: command,
         criadoEm: new Date().toISOString()
     };
 
     comandosPendentes.get(deviceId).push(comando);
 
-    registrarComando(
+    registrarHistorico(
         deviceId,
         command,
-        mensagem || ""
+        ""
     );
 
     console.log("");
@@ -340,11 +335,6 @@ app.post("/api/command", (req, res) => {
     console.log("========================================");
     console.log("Dispositivo:", deviceId);
     console.log("Comando:    ", command);
-
-    if (mensagem) {
-        console.log("Mensagem:   ", mensagem);
-    }
-
     console.log("========================================");
     console.log("");
 
@@ -392,7 +382,7 @@ app.get("/api/command/:deviceId", (req, res) => {
 
     res.status(200).json({
         sucesso: true,
-        comando
+        comando: comando
     });
 });
 
@@ -414,7 +404,7 @@ app.post("/api/response", (req, res) => {
     }
 
     respostasDispositivos.set(deviceId, {
-        response,
+        response: response,
         recebidoEm: new Date().toISOString()
     });
 
@@ -485,21 +475,17 @@ app.get("/api/devices", (req, res) => {
 // ÚLTIMA RESPOSTA
 // ========================================
 
-app.get(
-    "/api/response/:deviceId",
-    (req, res) => {
+app.get("/api/response/:deviceId", (req, res) => {
+    const resposta =
+        respostasDispositivos.get(
+            req.params.deviceId
+        );
 
-        const resposta =
-            respostasDispositivos.get(
-                req.params.deviceId
-            );
-
-        res.json({
-            sucesso: true,
-            resposta: resposta || null
-        });
-    }
-);
+    res.json({
+        sucesso: true,
+        resposta: resposta || null
+    });
+});
 
 // ========================================
 // HISTÓRICO
@@ -517,7 +503,9 @@ app.get("/api/history", (req, res) => {
 // ========================================
 
 app.post("/api/device/revoke", (req, res) => {
-    const { deviceId } = req.body || {};
+    const {
+        deviceId
+    } = req.body || {};
 
     if (!deviceId) {
         return res.status(400).json({
@@ -545,19 +533,11 @@ app.post("/api/device/revoke", (req, res) => {
 
     comandosPendentes.delete(deviceId);
 
-    registrarComando(
+    registrarHistorico(
         deviceId,
         "REVOKE",
         "Dispositivo revogado"
     );
-
-    console.log("");
-    console.log("========================================");
-    console.log("       DISPOSITIVO REVOGADO");
-    console.log("========================================");
-    console.log("Dispositivo:", deviceId);
-    console.log("========================================");
-    console.log("");
 
     res.json({
         sucesso: true,
@@ -570,7 +550,9 @@ app.post("/api/device/revoke", (req, res) => {
 // ========================================
 
 app.post("/api/device/unrevoke", (req, res) => {
-    const { deviceId } = req.body || {};
+    const {
+        deviceId
+    } = req.body || {};
 
     if (!deviceId) {
         return res.status(400).json({
@@ -596,7 +578,7 @@ app.post("/api/device/unrevoke", (req, res) => {
         dispositivo
     );
 
-    registrarComando(
+    registrarHistorico(
         deviceId,
         "UNREVOKE",
         "Dispositivo reativado"
@@ -616,7 +598,6 @@ app.get("/", (req, res) => {
 
     res.send(`
 <!DOCTYPE html>
-
 <html lang="pt-BR">
 
 <head>
@@ -638,354 +619,112 @@ app.get("/", (req, res) => {
 
 body {
     margin: 0;
-    padding: 0;
-
-    background:
-        linear-gradient(
-            135deg,
-            #080b12,
-            #101827
-        );
-
-    color: #ffffff;
-
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    min-height: 100vh;
+    padding: 30px;
+    background: #0f1115;
+    color: white;
+    font-family: Arial, sans-serif;
 }
 
-.container {
-    width: 94%;
-    max-width: 1400px;
-
-    margin: auto;
-
-    padding: 30px 0 50px;
+h1 {
+    margin-bottom: 5px;
 }
 
-.header {
-    background: #111827;
-
-    border: 1px solid #263247;
-
-    border-radius: 18px;
-
-    padding: 25px;
-
-    margin-bottom: 20px;
-
-    box-shadow:
-        0 15px 40px
-        rgba(0,0,0,0.35);
-}
-
-.header h1 {
-    margin: 0 0 8px;
-
-    font-size: 32px;
-}
-
-.header p {
-    margin: 0;
-
-    color: #9ca3af;
-}
-
-.server-status {
-    margin-top: 18px;
-
-    display: inline-flex;
-
-    align-items: center;
-
-    gap: 8px;
-
-    padding: 8px 14px;
-
-    border-radius: 20px;
-
-    background: #062e1b;
-
-    color: #4ade80;
-
-    font-size: 14px;
-}
-
-.dot {
-    width: 9px;
-    height: 9px;
-
-    border-radius: 50%;
-
-    background: #22c55e;
-
-    box-shadow:
-        0 0 10px
-        rgba(34,197,94,0.8);
+.subtitle {
+    color: #999;
+    margin-bottom: 30px;
 }
 
 .cards {
-    display: grid;
-
-    grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(180px, 1fr)
-        );
-
-    gap: 15px;
-
-    margin-bottom: 25px;
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
 }
 
 .card {
-    background: #111827;
-
-    border: 1px solid #263247;
-
-    border-radius: 16px;
-
+    background: #191c23;
+    border: 1px solid #292d36;
+    border-radius: 12px;
     padding: 20px;
+    min-width: 180px;
 }
 
 .card-title {
-    color: #9ca3af;
-
+    color: #999;
     font-size: 13px;
-
-    letter-spacing: 1px;
-
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 
 .card-value {
     font-size: 32px;
-
     font-weight: bold;
 }
 
-.devices-title {
-    margin: 25px 0 15px;
-}
-
 .device {
-    background: #111827;
-
-    border: 1px solid #263247;
-
-    border-radius: 18px;
-
-    padding: 22px;
-
+    background: #191c23;
+    border: 1px solid #292d36;
+    border-radius: 12px;
+    padding: 20px;
     margin-bottom: 15px;
-
-    box-shadow:
-        0 10px 30px
-        rgba(0,0,0,0.25);
 }
 
 .device-header {
     display: flex;
-
     justify-content: space-between;
-
     align-items: center;
-
-    gap: 15px;
-
+    gap: 20px;
     flex-wrap: wrap;
 }
 
 .device-name {
-    font-size: 22px;
-
-    font-weight: bold;
-}
-
-.device-id {
-    color: #9ca3af;
-
-    font-size: 13px;
-
-    margin-top: 5px;
-}
-
-.status {
-    padding: 7px 13px;
-
-    border-radius: 20px;
-
-    font-size: 12px;
-
+    font-size: 20px;
     font-weight: bold;
 }
 
 .online {
-    background: #06351e;
-
-    color: #4ade80;
-
-    border: 1px solid #166534;
+    color: #42e87d;
 }
 
 .offline {
-    background: #351010;
-
-    color: #f87171;
-
-    border: 1px solid #7f1d1d;
-}
-
-.revoked {
-    background: #3b2a05;
-
-    color: #fbbf24;
-
-    border: 1px solid #92400e;
-}
-
-.info-grid {
-    display: grid;
-
-    grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(220px, 1fr)
-        );
-
-    gap: 10px;
-
-    margin-top: 20px;
+    color: #ff5555;
 }
 
 .info {
-    background: #0b111d;
-
-    border-radius: 10px;
-
-    padding: 12px;
-}
-
-.info-label {
-    color: #6b7280;
-
-    font-size: 11px;
-
-    text-transform: uppercase;
-
-    margin-bottom: 5px;
-}
-
-.info-value {
-    font-size: 14px;
-
-    word-break: break-word;
-}
-
-.actions {
-    display: flex;
-
-    flex-wrap: wrap;
-
-    gap: 10px;
-
-    margin-top: 20px;
+    color: #aaa;
+    line-height: 1.7;
+    margin-top: 15px;
 }
 
 button {
-    border: none;
-
-    border-radius: 9px;
-
-    padding: 11px 17px;
-
-    background: #2563eb;
-
+    background: #292d36;
     color: white;
-
-    font-weight: bold;
-
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
     cursor: pointer;
+    margin-right: 8px;
 }
 
 button:hover {
-    background: #1d4ed8;
-}
-
-button.secondary {
-    background: #374151;
-}
-
-button.secondary:hover {
-    background: #4b5563;
-}
-
-button.warning {
-    background: #b45309;
-}
-
-button.warning:hover {
-    background: #92400e;
-}
-
-.empty {
-    text-align: center;
-
-    padding: 45px;
-
-    background: #111827;
-
-    border: 1px solid #263247;
-
-    border-radius: 18px;
-
-    color: #9ca3af;
+    background: #3a3f4b;
 }
 
 .history {
     margin-top: 30px;
-
-    background: #111827;
-
-    border: 1px solid #263247;
-
-    border-radius: 18px;
-
-    padding: 22px;
 }
 
 .history-item {
-    padding: 12px 0;
-
-    border-bottom:
-        1px solid #1f2937;
-
-    font-size: 14px;
+    background: #191c23;
+    border: 1px solid #292d36;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    color: #aaa;
 }
 
-.history-item:last-child {
-    border-bottom: none;
-}
-
-.history-command {
-    font-weight: bold;
-}
-
-.history-details {
-    color: #9ca3af;
-
-    margin-top: 4px;
-}
-
-.refresh {
-    color: #6b7280;
-
-    font-size: 12px;
-
-    margin-top: 10px;
+.empty {
+    color: #777;
+    padding: 20px;
 }
 
 </style>
@@ -994,777 +733,283 @@ button.warning:hover {
 
 <body>
 
-<div class="container">
+<h1>MASTER CONTROL</h1>
 
-    <div class="header">
+<div class="subtitle">
+Painel de administração de dispositivos
+</div>
 
-        <h1>
-            MASTER CONTROL
-        </h1>
+<div class="cards">
 
-        <p>
-            Painel de administração de dispositivos
-        </p>
-
-        <div class="server-status">
-
-            <span class="dot"></span>
-
-            SERVIDOR ONLINE
-
+    <div class="card">
+        <div class="card-title">
+            DISPOSITIVOS
         </div>
 
         <div
-            class="refresh"
-            id="refreshText"
+            class="card-value"
+            id="total"
         >
-            Atualizando...
+            0
         </div>
-
     </div>
 
-
-    <div class="cards">
-
-        <div class="card">
-
-            <div class="card-title">
-                DISPOSITIVOS
-            </div>
-
-            <div
-                class="card-value"
-                id="total"
-            >
-                0
-            </div>
-
+    <div class="card">
+        <div class="card-title">
+            ONLINE
         </div>
 
-
-        <div class="card">
-
-            <div class="card-title">
-                ONLINE
-            </div>
-
-            <div
-                class="card-value"
-                id="online"
-            >
-                0
-            </div>
-
+        <div
+            class="card-value"
+            id="online"
+        >
+            0
         </div>
-
-
-        <div class="card">
-
-            <div class="card-title">
-                OFFLINE
-            </div>
-
-            <div
-                class="card-value"
-                id="offline"
-            >
-                0
-            </div>
-
-        </div>
-
     </div>
 
+    <div class="card">
+        <div class="card-title">
+            OFFLINE
+        </div>
 
-    <h2 class="devices-title">
-        Dispositivos
+        <div
+            class="card-value"
+            id="offline"
+        >
+            0
+        </div>
+    </div>
+
+</div>
+
+<div id="devices">
+
+    <div class="empty">
+        Procurando dispositivos...
+    </div>
+
+</div>
+
+<div class="history">
+
+    <h2>
+        Histórico
     </h2>
 
-
-    <div id="devices">
+    <div id="historyList">
 
         <div class="empty">
-            Procurando dispositivos...
-        </div>
-
-    </div>
-
-
-    <div class="history">
-
-        <h2>
-            Histórico de comandos
-        </h2>
-
-        <div id="historyList">
-
-            <div class="empty">
-                Nenhum comando registrado.
-            </div>
-
+            Nenhum comando registrado.
         </div>
 
     </div>
 
 </div>
 
-
 <script>
 
-function escapar(texto) {
-
-    if (
-        texto === null ||
-        texto === undefined
-    ) {
-        return "";
-    }
-
-    return String(texto)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-}
-
-
-// ========================================
-// FORMATAR DATA
-// ========================================
-
-function formatarData(data) {
-
-    if (!data) {
-        return "Desconhecido";
-    }
-
-    try {
-
-        return new Date(data)
-            .toLocaleString(
-                "pt-BR"
-            );
-
-    } catch {
-
-        return data;
-    }
-}
-
-
-// ========================================
-// FORMATAR ARMAZENAMENTO
-// ========================================
-
-function formatarBytes(bytes) {
-
-    if (
-        bytes === null ||
-        bytes === undefined
-    ) {
-        return "Não informado";
-    }
-
-    if (bytes < 1024) {
-        return bytes + " B";
-    }
-
-    if (bytes < 1024 * 1024) {
-        return (
-            (bytes / 1024)
-                .toFixed(1)
-            + " KB"
-        );
-    }
-
-    if (
-        bytes <
-        1024 * 1024 * 1024
-    ) {
-        return (
-            (bytes /
-                (1024 * 1024))
-                .toFixed(1)
-            + " MB"
-        );
-    }
-
-    return (
-        (bytes /
-            (1024 * 1024 * 1024))
-            .toFixed(2)
-        + " GB"
-    );
-}
-
-
-// ========================================
-// ENVIAR COMANDO
-// ========================================
-
-async function enviarComando(
-    deviceId,
-    command,
-    mensagem = ""
-) {
+async function carregarDispositivos() {
 
     try {
 
         const resposta =
-            await fetch(
-                "/api/command",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-                            deviceId,
-                            command,
-                            mensagem
-                        })
-                }
-            );
+            await fetch("/api/devices");
 
         const dados =
             await resposta.json();
 
         if (!dados.sucesso) {
+            return;
+        }
 
-            alert(
-                dados.erro ||
-                "Erro ao enviar comando"
-            );
+        const lista =
+            dados.dispositivos || [];
+
+        document.getElementById("total")
+            .textContent = lista.length;
+
+        document.getElementById("online")
+            .textContent =
+                lista.filter(
+                    d => d.status === "ONLINE"
+                ).length;
+
+        document.getElementById("offline")
+            .textContent =
+                lista.filter(
+                    d => d.status === "OFFLINE"
+                ).length;
+
+        const container =
+            document.getElementById("devices");
+
+        if (lista.length === 0) {
+
+            container.innerHTML =
+                '<div class="empty">' +
+                'Nenhum dispositivo conectado.' +
+                '</div>';
 
             return;
         }
 
-        atualizarTudo();
+        container.innerHTML =
+            lista.map(d => {
+
+                const statusClass =
+                    d.status === "ONLINE"
+                        ? "online"
+                        : "offline";
+
+                const bateria =
+                    d.bateria !== null
+                        ? d.bateria + "%"
+                        : "Não informado";
+
+                const local =
+                    d.cidade
+                        ? d.cidade +
+                          ", " +
+                          d.estado
+                        : "Não informado";
+
+                return \`
+<div class="device">
+
+    <div class="device-header">
+
+        <div>
+
+            <div class="device-name">
+                \${d.deviceId}
+            </div>
+
+            <div class="\${statusClass}">
+                \${d.status}
+            </div>
+
+        </div>
+
+        <div>
+
+            <button
+                onclick="enviarStatus('\${d.deviceId}')"
+            >
+                STATUS
+            </button>
+
+            <button
+                onclick="revogar('\${d.deviceId}')"
+            >
+                REVOGAR
+            </button>
+
+        </div>
+
+    </div>
+
+    <div class="info">
+
+        <b>Marca:</b>
+        \${d.marca || "Não informado"}
+        <br>
+
+        <b>Modelo:</b>
+        \${d.modelo || "Não informado"}
+        <br>
+
+        <b>Android:</b>
+        \${d.android || "Não informado"}
+        <br>
+
+        <b>IP:</b>
+        \${d.ip || "Não informado"}
+        <br>
+
+        <b>Bateria:</b>
+        \${bateria}
+        <br>
+
+        <b>Local:</b>
+        \${local}
+        <br>
+
+        <b>Endereço:</b>
+        \${d.endereco || "Não informado"}
+        <br>
+
+        <b>Latitude:</b>
+        \${d.latitude ?? "Não informado"}
+        <br>
+
+        <b>Longitude:</b>
+        \${d.longitude ?? "Não informado"}
+
+    </div>
+
+</div>
+\`;
+
+            }).join("");
+
+    } catch (erro) {
+
+        console.error(
+            "Erro ao carregar dispositivos:",
+            erro
+        );
+
+    }
+}
+
+async function enviarStatus(deviceId) {
+
+    try {
+
+        const resposta =
+            await fetch("/api/command", {
+
+                method: "POST",
+
+                headers: {
+                    "Content-Type":
+                        "application/json"
+                },
+
+                body: JSON.stringify({
+                    deviceId: deviceId,
+                    command: "STATUS"
+                })
+            });
+
+        const dados =
+            await resposta.json();
+
+        alert(
+            dados.mensagem ||
+            dados.erro ||
+            "Comando enviado"
+        );
 
     } catch (erro) {
 
         alert(
-            "Erro de comunicação com o servidor."
-        );
-
-        console.error(erro);
-    }
-}
-
-
-// ========================================
-// RENDERIZAR DISPOSITIVOS
-// ========================================
-
-function renderizarDispositivos(
-    lista
-) {
-
-    const container =
-        document.getElementById(
-            "devices"
-        );
-
-    document.getElementById(
-        "total"
-    ).textContent =
-        lista.length;
-
-    document.getElementById(
-        "online"
-    ).textContent =
-        lista.filter(
-            d => d.status === "ONLINE"
-        ).length;
-
-    document.getElementById(
-        "offline"
-    ).textContent =
-        lista.filter(
-            d => d.status === "OFFLINE"
-        ).length;
-
-
-    if (lista.length === 0) {
-
-        container.innerHTML = `
-            <div class="empty">
-                Nenhum dispositivo conectado.
-            </div>
-        `;
-
-        return;
-    }
-
-
-    container.innerHTML =
-        lista.map(
-            dispositivo => {
-
-                let classeStatus =
-                    dispositivo.revogado
-                        ? "revoked"
-                        : dispositivo.status ===
-                          "ONLINE"
-                            ? "online"
-                            : "offline";
-
-                let textoStatus =
-                    dispositivo.revogado
-                        ? "REVOGADO"
-                        : dispositivo.status;
-
-
-                const bateria =
-                    dispositivo.bateria !== null
-                        ? dispositivo.bateria + "%"
-                        : "Não informado";
-
-
-                const carregando =
-                    dispositivo.carregando === true
-                        ? "Sim"
-                        : dispositivo.carregando === false
-                            ? "Não"
-                            : "Não informado";
-
-
-                const localizacao =
-                    dispositivo.latitude !== null &&
-                    dispositivo.longitude !== null
-
-                        ? `${escapar(
-                            dispositivo.latitude
-                        )}, ${
-                            escapar(
-                                dispositivo.longitude
-                            )
-                        }`
-
-                        : "Não informado";
-
-
-                return `
-
-                <div class="device">
-
-                    <div class="device-header">
-
-                        <div>
-
-                            <div class="device-name">
-
-                                ${escapar(
-                                    dispositivo.modelo ||
-                                    "Dispositivo"
-                                )}
-
-                            </div>
-
-                            <div class="device-id">
-
-                                ID:
-                                ${escapar(
-                                    dispositivo.deviceId
-                                )}
-
-                            </div>
-
-                        </div>
-
-
-                        <div
-                            class="status ${classeStatus}"
-                        >
-                            ${textoStatus}
-                        </div>
-
-                    </div>
-
-
-                    <div class="info-grid">
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Fabricante
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    dispositivo.fabricante ||
-                                    dispositivo.marca ||
-                                    "Não informado"
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Android
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    dispositivo.android ||
-                                    "Não informado"
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                IP
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    dispositivo.ip ||
-                                    "Não informado"
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Bateria
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    bateria
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Carregando
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    carregando
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Localização
-                            </div>
-
-                            <div class="info-value">
-                                ${localizacao}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Endereço
-                            </div>
-
-                            <div class="info-value">
-                                ${escapar(
-                                    dispositivo.endereco ||
-                                    "Não informado"
-                                )}
-                            </div>
-
-                        </div>
-
-
-                        <div class="info">
-
-                            <div class="info-label">
-                                Último contato
-                            </div>
-
-                            <div class="info-value">
-                                ${formatarData(
-                                    dispositivo.ultimoContato
-                                )}
-                            </div>
-
-                        </div>
-
-
-                    </div>
-
-
-                    <div class="actions">
-
-                        <button
-                            onclick="enviarComando(
-                                '${escapar(
-                                    dispositivo.deviceId
-                                )}',
-                                'PING'
-                            )"
-                        >
-                            PING
-                        </button>
-
-
-                        <button
-                            class="secondary"
-                            onclick="enviarComando(
-                                '${escapar(
-                                    dispositivo.deviceId
-                                )}',
-                                'STATUS'
-                            )"
-                        >
-                            STATUS
-                        </button>
-
-
-                        ${
-                            !dispositivo.revogado
-
-                            ? `
-
-                            <button
-                                class="warning"
-                                onclick="revogar(
-                                    '${escapar(
-                                        dispositivo.deviceId
-                                    )}'
-                                )"
-                            >
-                                REVOGAR
-                            </button>
-
-                            `
-
-                            : `
-
-                            <button
-                                onclick="reativar(
-                                    '${escapar(
-                                        dispositivo.deviceId
-                                    )}'
-                                )"
-                            >
-                                REATIVAR
-                            </button>
-
-                            `
-                        }
-
-                    </div>
-
-                </div>
-
-                `;
-            }
-        ).join("");
-}
-
-
-// ========================================
-// HISTÓRICO
-// ========================================
-
-function renderizarHistorico(
-    historico
-) {
-
-    const container =
-        document.getElementById(
-            "historyList"
-        );
-
-    if (
-        !historico ||
-        historico.length === 0
-    ) {
-
-        container.innerHTML = `
-            <div class="empty">
-                Nenhum comando registrado.
-            </div>
-        `;
-
-        return;
-    }
-
-
-    container.innerHTML =
-        historico
-            .slice(0, 20)
-            .map(
-                item => `
-
-                <div class="history-item">
-
-                    <div class="history-command">
-
-                        ${escapar(
-                            item.command
-                        )}
-
-                        — 
-
-                        ${escapar(
-                            item.deviceId
-                        )}
-
-                    </div>
-
-                    <div class="history-details">
-
-                        ${escapar(
-                            item.detalhes ||
-                            ""
-                        )}
-
-                        <br>
-
-                        ${formatarData(
-                            item.criadoEm
-                        )}
-
-                    </div>
-
-                </div>
-
-                `
-            )
-            .join("");
-}
-
-
-// ========================================
-// ATUALIZAR DISPOSITIVOS
-// ========================================
-
-async function atualizarDispositivos() {
-
-    try {
-
-        const resposta =
-            await fetch(
-                "/api/devices?_=" +
-                Date.now()
-            );
-
-        const dados =
-            await resposta.json();
-
-        if (!dados.sucesso) {
-            return;
-        }
-
-        renderizarDispositivos(
-            dados.dispositivos || []
-        );
-
-        document.getElementById(
-            "refreshText"
-        ).textContent =
-            "Última atualização: " +
-            new Date()
-                .toLocaleTimeString(
-                    "pt-BR"
-                );
-
-    } catch (erro) {
-
-        console.error(
-            "Erro ao buscar dispositivos:",
-            erro
+            "Erro ao enviar comando."
         );
 
     }
 }
 
+async function revogar(deviceId) {
 
-// ========================================
-// ATUALIZAR HISTÓRICO
-// ========================================
-
-async function atualizarHistorico() {
-
-    try {
-
-        const resposta =
-            await fetch(
-                "/api/history?_=" +
-                Date.now()
-            );
-
-        const dados =
-            await resposta.json();
-
-        if (!dados.sucesso) {
-            return;
-        }
-
-        renderizarHistorico(
-            dados.historico || []
+    const confirmar =
+        confirm(
+            "Deseja revogar o dispositivo " +
+            deviceId +
+            "?"
         );
 
-    } catch (erro) {
-
-        console.error(
-            "Erro ao buscar histórico:",
-            erro
-        );
-    }
-}
-
-
-// ========================================
-// ATUALIZAR TUDO
-// ========================================
-
-async function atualizarTudo() {
-
-    await Promise.all([
-        atualizarDispositivos(),
-        atualizarHistorico()
-    ]);
-}
-
-
-// ========================================
-// REVOGAR
-// ========================================
-
-async function revogar(
-    deviceId
-) {
-
-    if (
-        !confirm(
-            "Revogar este dispositivo?"
-        )
-    ) {
+    if (!confirmar) {
         return;
     }
 
@@ -1781,104 +1026,97 @@ async function revogar(
                             "application/json"
                     },
 
-                    body:
-                        JSON.stringify({
-                            deviceId
-                        })
+                    body: JSON.stringify({
+                        deviceId: deviceId
+                    })
                 }
             );
 
         const dados =
             await resposta.json();
 
-        if (!dados.sucesso) {
+        alert(
+            dados.mensagem ||
+            dados.erro ||
+            "Operação concluída"
+        );
 
-            alert(
-                dados.erro ||
-                "Erro ao revogar."
-            );
-
-            return;
-        }
-
-        atualizarTudo();
+        carregarDispositivos();
 
     } catch (erro) {
 
-        console.error(erro);
-
         alert(
-            "Erro de comunicação."
+            "Erro ao revogar dispositivo."
         );
+
     }
 }
 
-
-// ========================================
-// REATIVAR
-// ========================================
-
-async function reativar(
-    deviceId
-) {
+async function carregarHistorico() {
 
     try {
 
         const resposta =
-            await fetch(
-                "/api/device/unrevoke",
-                {
-                    method: "POST",
-
-                    headers: {
-                        "Content-Type":
-                            "application/json"
-                    },
-
-                    body:
-                        JSON.stringify({
-                            deviceId
-                        })
-                }
-            );
+            await fetch("/api/history");
 
         const dados =
             await resposta.json();
 
-        if (!dados.sucesso) {
+        const lista =
+            dados.historico || [];
 
-            alert(
-                dados.erro ||
-                "Erro ao reativar."
+        const container =
+            document.getElementById(
+                "historyList"
             );
+
+        if (lista.length === 0) {
+
+            container.innerHTML =
+                '<div class="empty">' +
+                'Nenhum comando registrado.' +
+                '</div>';
 
             return;
         }
 
-        atualizarTudo();
+        container.innerHTML =
+            lista.slice(0, 30)
+                .map(item => \`
+<div class="history-item">
+
+    <b>\${item.command}</b>
+
+    — \${item.deviceId}
+
+    <br>
+
+    \${item.criadoEm}
+
+</div>
+\`)
+                .join("");
 
     } catch (erro) {
 
-        console.error(erro);
-
-        alert(
-            "Erro de comunicação."
+        console.error(
+            "Erro no histórico:",
+            erro
         );
+
     }
 }
 
-
-// ========================================
-// INICIALIZAÇÃO
-// ========================================
-
-atualizarTudo();
-
-
-// Atualiza a cada 5 segundos
+carregarDispositivos();
+carregarHistorico();
 
 setInterval(
-    atualizarTudo,
+    carregarDispositivos,
+    5000
+);
+
+setInterval(
+    carregarHistorico,
     5000
 );
 
@@ -1943,6 +1181,10 @@ app.listen(
 
         console.log(
             "Health: /health"
+        );
+
+        console.log(
+            "Comando disponível: STATUS"
         );
 
         console.log(
