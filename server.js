@@ -6,12 +6,23 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 10000;
 
-
 // ========================================
 // FILA DE COMANDOS
 // ========================================
 
 const comandosPendentes = new Map();
+
+// ========================================
+// RESPOSTAS DOS DISPOSITIVOS
+// ========================================
+
+const respostasDispositivos = new Map();
+
+// ========================================
+// ÚLTIMO CONTATO DOS DISPOSITIVOS
+// ========================================
+
+const dispositivos = new Map();
 
 
 // ========================================
@@ -35,6 +46,7 @@ async function buscarEndereco(latitude, longitude) {
     });
 
     if (!resposta.ok) {
+
         throw new Error(
             `Nominatim respondeu HTTP ${resposta.status}`
         );
@@ -60,21 +72,61 @@ app.post("/api/device", async (req, res) => {
             "Desconhecido";
 
         if (ip.includes(",")) {
-            ip = ip.split(",")[0].trim();
+
+            ip = ip
+                .split(",")[0]
+                .trim();
         }
 
-        ip = ip.replace("::ffff:", "");
+        ip = ip.replace(
+            "::ffff:",
+            ""
+        );
 
+        const deviceId =
+            dados.deviceId ||
+            "desconhecido";
+
+        // Registrar dispositivo
+
+        dispositivos.set(
+            deviceId,
+            {
+                deviceId,
+                marca: dados.marca || "",
+                fabricante: dados.fabricante || "",
+                modelo: dados.modelo || "",
+                android: dados.android || "",
+                ip,
+                latitude: dados.latitude,
+                longitude: dados.longitude,
+                bairro: dados.bairro || "",
+                cidade: dados.cidade || "",
+                estado: dados.estado || "",
+                cep: dados.cep || "",
+                pais: dados.pais || "",
+                ultimoContato:
+                    new Date().toISOString()
+            }
+        );
 
         console.log("");
-        console.log("========================================");
-        console.log("       NOVO DISPOSITIVO CONECTADO");
-        console.log("========================================");
 
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "       NOVO DISPOSITIVO CONECTADO"
+        );
+
+        console.log(
+            "========================================"
+        );
 
         console.log(
             "ID:          ",
-            dados.deviceId || "Não informado"
+            deviceId
         );
 
         console.log(
@@ -103,8 +155,11 @@ app.post("/api/device", async (req, res) => {
         );
 
 
-        const latitude = dados.latitude;
-        const longitude = dados.longitude;
+        const latitude =
+            dados.latitude;
+
+        const longitude =
+            dados.longitude;
 
 
         if (
@@ -113,7 +168,10 @@ app.post("/api/device", async (req, res) => {
         ) {
 
             console.log("");
-            console.log("COORDENADAS:");
+
+            console.log(
+                "COORDENADAS:"
+            );
 
             console.log(
                 "Latitude:    ",
@@ -133,7 +191,6 @@ app.post("/api/device", async (req, res) => {
                         latitude,
                         longitude
                     );
-
 
                 const address =
                     endereco.address || {};
@@ -170,34 +227,30 @@ app.post("/api/device", async (req, res) => {
 
 
                 console.log("");
+
                 console.log(
                     "LOCALIZAÇÃO APROXIMADA:"
                 );
-
 
                 console.log(
                     "Bairro:      ",
                     bairro
                 );
 
-
                 console.log(
                     "Cidade:      ",
                     cidade
                 );
-
 
                 console.log(
                     "Estado:      ",
                     estado
                 );
 
-
                 console.log(
                     "CEP:         ",
                     cep
                 );
-
 
                 console.log(
                     "País:        ",
@@ -206,16 +259,15 @@ app.post("/api/device", async (req, res) => {
 
 
                 console.log("");
+
                 console.log(
                     "Endereço retornado pelo serviço:"
                 );
-
 
                 console.log(
                     endereco.display_name ||
                     "Não informado"
                 );
-
 
             } catch (erroEndereco) {
 
@@ -225,10 +277,10 @@ app.post("/api/device", async (req, res) => {
                 );
             }
 
-
         } else {
 
             console.log("");
+
             console.log(
                 "Localização não enviada pelo aplicativo."
             );
@@ -236,14 +288,19 @@ app.post("/api/device", async (req, res) => {
 
 
         console.log("");
-        console.log("========================================");
+
+        console.log(
+            "========================================"
+        );
+
         console.log("");
 
 
         res.status(200).json({
-            sucesso: true
-        });
 
+            sucesso: true
+
+        });
 
     } catch (erro) {
 
@@ -252,16 +309,17 @@ app.post("/api/device", async (req, res) => {
             erro
         );
 
-
         res.status(500).json({
+
             sucesso: false
+
         });
     }
 });
 
 
 // ========================================
-// ENVIAR COMANDO PARA O ANDROID
+// ENVIAR COMANDO
 // ========================================
 
 app.post("/api/command", (req, res) => {
@@ -275,14 +333,42 @@ app.post("/api/command", (req, res) => {
     if (!deviceId || !command) {
 
         return res.status(400).json({
+
             sucesso: false,
+
             erro:
                 "deviceId e command são obrigatórios"
+
         });
     }
 
 
-    if (!comandosPendentes.has(deviceId)) {
+    // Comandos permitidos
+
+    const comandosPermitidos = [
+        "PING",
+        "STATUS"
+    ];
+
+
+    if (
+        !comandosPermitidos.includes(command)
+    ) {
+
+        return res.status(400).json({
+
+            sucesso: false,
+
+            erro:
+                "Comando não permitido"
+
+        });
+    }
+
+
+    if (
+        !comandosPendentes.has(deviceId)
+    ) {
 
         comandosPendentes.set(
             deviceId,
@@ -295,17 +381,27 @@ app.post("/api/command", (req, res) => {
         .get(deviceId)
         .push({
 
-            command: command,
+            command,
 
             criadoEm:
                 new Date().toISOString()
+
         });
 
 
     console.log("");
-    console.log("========================================");
-    console.log("          NOVO COMANDO");
-    console.log("========================================");
+
+    console.log(
+        "========================================"
+    );
+
+    console.log(
+        "          NOVO COMANDO"
+    );
+
+    console.log(
+        "========================================"
+    );
 
     console.log(
         "Dispositivo:",
@@ -317,7 +413,9 @@ app.post("/api/command", (req, res) => {
         command
     );
 
-    console.log("========================================");
+    console.log(
+        "========================================"
+    );
 
 
     res.status(200).json({
@@ -326,6 +424,7 @@ app.post("/api/command", (req, res) => {
 
         mensagem:
             "Comando colocado na fila"
+
     });
 });
 
@@ -356,6 +455,7 @@ app.get(
                 sucesso: true,
 
                 comando: null
+
             });
         }
 
@@ -368,61 +468,511 @@ app.get(
 
             sucesso: true,
 
-            comando: comando
+            comando
+
         });
     }
 );
 
 
 // ========================================
-// RECEBER RESPOSTA DO ANDROID
+// RECEBER RESPOSTA
 // ========================================
 
-app.post("/api/response", (req, res) => {
+app.post(
+    "/api/response",
+    (req, res) => {
 
-    const {
-        deviceId,
-        response
-    } = req.body || {};
-
-
-    console.log("");
-    console.log("========================================");
-    console.log("       RESPOSTA DO DISPOSITIVO");
-    console.log("========================================");
+        const {
+            deviceId,
+            response
+        } = req.body || {};
 
 
-    console.log(
-        "Dispositivo:",
-        deviceId || "Não informado"
-    );
+        if (
+            !deviceId ||
+            !response
+        ) {
+
+            return res.status(400).json({
+
+                sucesso: false,
+
+                erro:
+                    "deviceId e response são obrigatórios"
+
+            });
+        }
 
 
-    console.log(
-        "Resposta:   ",
-        response || "Não informado"
-    );
+        respostasDispositivos.set(
+            deviceId,
+            {
+                response,
+
+                recebidoEm:
+                    new Date().toISOString()
+            }
+        );
 
 
-    console.log("========================================");
+        console.log("");
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "       RESPOSTA DO DISPOSITIVO"
+        );
+
+        console.log(
+            "========================================"
+        );
+
+        console.log(
+            "Dispositivo:",
+            deviceId
+        );
+
+        console.log(
+            "Resposta:   ",
+            response
+        );
+
+        console.log(
+            "========================================"
+        );
 
 
-    res.status(200).json({
+        res.status(200).json({
 
-        sucesso: true
-    });
-});
+            sucesso: true
+
+        });
+    }
+);
 
 
 // ========================================
-// PÁGINA PRINCIPAL
+// LISTAR DISPOSITIVOS
+// ========================================
+
+app.get(
+    "/api/devices",
+    (req, res) => {
+
+        res.json({
+
+            sucesso: true,
+
+            dispositivos:
+                Array.from(
+                    dispositivos.values()
+                )
+        });
+    }
+);
+
+
+// ========================================
+// ÚLTIMA RESPOSTA
+// ========================================
+
+app.get(
+    "/api/response/:deviceId",
+    (req, res) => {
+
+        const resposta =
+            respostasDispositivos.get(
+                req.params.deviceId
+            );
+
+
+        if (!resposta) {
+
+            return res.json({
+
+                sucesso: true,
+
+                resposta: null
+
+            });
+        }
+
+
+        res.json({
+
+            sucesso: true,
+
+            resposta
+
+        });
+    }
+);
+
+
+// ========================================
+// PAINEL WEB
 // ========================================
 
 app.get("/", (req, res) => {
 
-    res.status(200).send(
-        "Servidor funcionando!"
+    res.send(`
+
+<!DOCTYPE html>
+
+<html lang="pt-BR">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport"
+      content="width=device-width,
+               initial-scale=1.0">
+
+<title>Controle do Dispositivo</title>
+
+<style>
+
+body {
+
+    margin: 0;
+
+    background: #111;
+
+    color: white;
+
+    font-family: Arial, sans-serif;
+
+}
+
+.container {
+
+    max-width: 700px;
+
+    margin: 50px auto;
+
+    padding: 25px;
+
+}
+
+h1 {
+
+    text-align: center;
+
+}
+
+.card {
+
+    background: #1d1d1d;
+
+    padding: 25px;
+
+    border-radius: 12px;
+
+    margin-top: 20px;
+
+}
+
+.status {
+
+    margin: 15px 0;
+
+    padding: 12px;
+
+    background: #292929;
+
+    border-radius: 8px;
+
+}
+
+button {
+
+    padding: 14px 25px;
+
+    margin: 5px;
+
+    border: none;
+
+    border-radius: 8px;
+
+    cursor: pointer;
+
+    font-size: 16px;
+
+}
+
+button:hover {
+
+    opacity: 0.8;
+
+}
+
+pre {
+
+    background: #000;
+
+    padding: 15px;
+
+    border-radius: 8px;
+
+    overflow-x: auto;
+
+}
+
+</style>
+
+</head>
+
+
+<body>
+
+<div class="container">
+
+<h1>
+Controle do Dispositivo
+</h1>
+
+
+<div class="card">
+
+<h2>
+celular-001
+</h2>
+
+
+<div class="status">
+
+Status:
+
+<strong id="status">
+Verificando...
+</strong>
+
+</div>
+
+
+<button onclick="enviar('PING')">
+PING
+</button>
+
+
+<button onclick="enviar('STATUS')">
+STATUS
+</button>
+
+
+<h3>
+Última resposta
+</h3>
+
+
+<pre id="resposta">
+Nenhuma resposta ainda.
+</pre>
+
+</div>
+
+</div>
+
+
+<script>
+
+const deviceId =
+    "celular-001";
+
+
+async function enviar(command) {
+
+    const resposta =
+        await fetch(
+            "/api/command",
+            {
+
+                method: "POST",
+
+                headers: {
+
+                    "Content-Type":
+                        "application/json"
+
+                },
+
+                body: JSON.stringify({
+
+                    deviceId,
+
+                    command
+
+                })
+
+            }
+        );
+
+
+    const dados =
+        await resposta.json();
+
+
+    if (!dados.sucesso) {
+
+        alert(
+            dados.erro ||
+            "Erro"
+        );
+
+        return;
+    }
+
+
+    document.getElementById(
+        "resposta"
+    ).textContent =
+        "Comando enviado: " +
+        command;
+
+
+    setTimeout(
+        verificarResposta,
+        3000
     );
+}
+
+
+async function verificarResposta() {
+
+    try {
+
+        const resposta =
+            await fetch(
+                "/api/response/" +
+                deviceId
+            );
+
+
+        const dados =
+            await resposta.json();
+
+
+        if (
+            dados.sucesso &&
+            dados.resposta
+        ) {
+
+            document.getElementById(
+                "resposta"
+            ).textContent =
+                dados.resposta.response;
+
+        }
+
+    } catch (erro) {
+
+        console.error(erro);
+    }
+}
+
+
+async function verificarStatus() {
+
+    try {
+
+        const resposta =
+            await fetch(
+                "/api/devices"
+            );
+
+
+        const dados =
+            await resposta.json();
+
+
+        const dispositivo =
+            dados.dispositivos.find(
+                d =>
+                    d.deviceId ===
+                    deviceId
+            );
+
+
+        if (!dispositivo) {
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                "OFFLINE";
+
+            return;
+        }
+
+
+        const ultimoContato =
+            new Date(
+                dispositivo.ultimoContato
+            );
+
+
+        const agora =
+            new Date();
+
+
+        const segundos =
+            (
+                agora -
+                ultimoContato
+            ) / 1000;
+
+
+        if (segundos < 30) {
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                "ONLINE";
+
+        } else {
+
+            document.getElementById(
+                "status"
+            ).textContent =
+                "OFFLINE";
+        }
+
+    } catch (erro) {
+
+        document.getElementById(
+            "status"
+        ).textContent =
+            "ERRO";
+    }
+}
+
+
+setInterval(
+    verificarStatus,
+    5000
+);
+
+
+setInterval(
+    verificarResposta,
+    3000
+);
+
+
+verificarStatus();
+
+verificarResposta();
+
+</script>
+
+</body>
+
+</html>
+
+    `);
 });
 
 
@@ -452,6 +1002,10 @@ app.listen(
         console.log(
             "Porta:",
             PORT
+        );
+
+        console.log(
+            "Painel: /"
         );
 
         console.log(
